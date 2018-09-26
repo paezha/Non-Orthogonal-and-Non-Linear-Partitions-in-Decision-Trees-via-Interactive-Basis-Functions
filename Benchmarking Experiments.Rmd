@@ -1,0 +1,2215 @@
+---
+title: "Benchmarking Experiments"
+author: "Antonio Paez"
+date: "May 14, 2018"
+output: html_document
+---
+
+In this document, the benchmarking experiments are conducted.
+
+Begin by clearing the environment and loading libraries.
+```{r Initialize, echo = FALSE, warning = FALSE, message = FALSE}
+#Clean environment
+rm(list = ls())
+#Load packages used for analysis
+#library(bookdown)
+library(tidyverse)
+#library(plotly)
+library(tree)
+library(evtree)
+library(ggmap)
+library(readr)
+library(rgdal)
+library(knitr)
+library(kableExtra)
+library(mlbench)
+library(dprep)
+library(rattle.data)
+library(microbenchmark)
+#library(gbm)
+#library(multinomRob)
+library(randomForest)
+```
+
+Load the data needed for the experiments.
+```{r read-benchmark-data, echo = FALSE}
+#read datasets for benchmarking
+#load("Balance_Scale.Rda")
+#data(wine)
+#data(bupa)
+#bupa[7]<-as.factor(bupa$V7)
+#data(BostonHousing)
+#data(PimaIndiansDiabetes)
+#data(Glass)
+#data(Shuttle)
+#data(LetterRecognition)
+#data(BBBClub)
+```
+
+As discussed in the paper, centering and scaling the data is important. For these experiments, the data have been centered on the mean and scaled to the unit interval.
+```{r}
+#Scale variables
+#Balance Scale
+#maxs <- apply(BalanceScale[,2:5], 2, max) 
+#mins <- apply(BalanceScale[,2:5], 2, min)
+#BalanceScale <- data.frame(Class = BalanceScale$Class,
+#                     as.data.frame(scale(BalanceScale[,2:5], center = mins, scale = maxs - mins)))
+#
+##Wine
+#maxs <- apply(wine[,2:14], 2, max) 
+#mins <- apply(wine[,2:14], 2, min)
+#wine <- data.frame(Type = wine$Type,
+#                     as.data.frame(scale(wine[,2:14], center = mins, scale = maxs - mins)))
+#
+##BUPA
+#maxs <- apply(bupa[,1:6], 2, max) 
+#mins <- apply(bupa[,1:6], 2, min)
+#bupa <- data.frame(V7 = bupa$V7,
+#                     as.data.frame(scale(bupa[,1:6], center = mins, scale = maxs - mins)))
+#
+##Boston Housing
+#BostonHousing <- transmute(BostonHousing, 
+#chas = chas, crim = crim, zn = zn, indus = indus, nox = nox, rm = rm, age = age, dis = dis, 
+#rad = rad, tax = tax, ptratio = ptratio, b = b, lstat = lstat, medv = medv)
+#maxs <- apply(BostonHousing[,2:14], 2, max) 
+#mins <- apply(BostonHousing[,2:14], 2, min)
+#BostonHousing <- data.frame(chas = BostonHousing$chas,
+#                     as.data.frame(scale(BostonHousing[,2:14], center = mins, scale = maxs - mins)))
+#
+##PIMA
+#maxs <- apply(PimaIndiansDiabetes[,1:8], 2, max) 
+#mins <- apply(PimaIndiansDiabetes[,1:8], 2, min)
+#PimaIndiansDiabetes <- data.frame(diabetes = PimaIndiansDiabetes$diabetes,
+#                     as.data.frame(scale(PimaIndiansDiabetes[,1:8], center = mins, scale = maxs - mins)))
+#
+##Glass
+#maxs <- apply(Glass[,1:9], 2, max) 
+#mins <- apply(Glass[,1:9], 2, min)
+#Glass <- data.frame(Type = Glass$Type,
+#                     as.data.frame(scale(Glass[,1:9], center = mins, scale = maxs - mins)))
+#
+##Shuttle
+#maxs <- apply(Shuttle[,1:9], 2, max) 
+#mins <- apply(Shuttle[,1:9], 2, min)
+#Shuttle <- data.frame(Class = Shuttle$Class,
+#                     as.data.frame(scale(Shuttle[,1:9], center = mins, scale = maxs - mins)))
+#
+##Letter recognition
+#maxs <- apply(LetterRecognition[,2:17], 2, max) 
+#mins <- apply(LetterRecognition[,2:17], 2, min)
+#LetterRecognition <- data.frame(lettr = LetterRecognition$lettr,
+#                     as.data.frame(scale(LetterRecognition[,2:17], center = mins, scale = maxs - mins)))
+#
+##BBBClub
+#maxs <- apply(BBBClub[,3:11], 2, max) 
+#mins <- apply(BBBClub[,3:11], 2, min)
+#BBBClub <- data.frame(choice = BBBClub$choice, gender = BBBClub$gender,
+#                     as.data.frame(scale(BBBClub[,3:11], center = mins, scale = maxs - mins)))
+```
+
+
+For convenience, save all datasets in a single .RData file.
+```{r}
+#save(BalanceScale, wine, bupa, BostonHousing, PimaIndiansDiabetes, Glass, Shuttle, LetterRecognition, BBBClub,
+#     file = "Data for Benchmarking.RData")
+```
+
+```{r}
+load("Data for Benchmarking.RData")
+```
+
+<!-- The following chunks summarize the datasets. Note the large size of the Shuttle and Letter Recognition datasets. These datasets are quite time consumuing when using the evolutionary tree algorithms. -->
+<!-- ```{r summary-balance, results="hide", echo=FALSE} -->
+<!-- #in this and the following chunks summarize the datasets to see whether they are regression, classification, and number of variables of each type -->
+<!-- summary(BalanceScale) -->
+<!-- ``` -->
+
+<!-- ```{r summary-wine, results="hide", echo=FALSE} -->
+<!-- summary(wine) -->
+<!-- ``` -->
+
+<!-- ```{r summary-BUPA, results="hide", echo=FALSE} -->
+<!-- summary(bupa) -->
+<!-- ``` -->
+
+<!-- ```{r summary-boston-housing, results="hide", echo=FALSE} -->
+<!-- summary(BostonHousing) -->
+<!-- ``` -->
+
+<!-- ```{r summary-PIMA, results="hide", echo=FALSE} -->
+<!-- summary(PimaIndiansDiabetes) -->
+<!-- ``` -->
+
+<!-- ```{r summary-glass, results="hide", echo=FALSE} -->
+<!-- summary(Glass) -->
+<!-- ``` -->
+
+<!-- ```{r summary-shuttle, results="hide", echo=FALSE} -->
+<!-- summary(Shuttle) -->
+<!-- ``` -->
+
+<!-- ```{r summary-letter-recognition, results="hide", echo=FALSE} -->
+<!-- summary(LetterRecognition) -->
+<!-- ``` -->
+
+<!-- ```{r summary-BBB-Club, results="hide", echo=FALSE} -->
+<!-- summary(BBBClub) -->
+<!-- ``` -->
+
+## Select number of folds for k-fold cross-validation
+```{r number-folds, echo = FALSE}
+#Select number of folds for cross-validation
+n_folds <- 10
+```
+
+## Balance Scale
+
+### Conventional tree with orthogonal partititions
+```{r balance-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#select dataset
+df <- BalanceScale
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(Class ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$Class)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$Class)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <- data.frame(dataset = "Balance Scale",
+                            method = "Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size)
+```
+
+### Time benchmark
+```{r balance-time-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+mbm = microbenchmark(
+  Tree = tree(Class ~., data = df),
+  times = 50
+)
+mbm$dataset <- "Balance Scale"
+mbm$bf <- "Orthogonal"
+```
+
+### Evolutionary tree with orthogonal partititions
+```{r balance-ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(Class ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Class)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Class)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Balance Scale",
+                            method = "Evolutionary Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r balance-time-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(Class ~., data = df),
+  times = 50
+)
+junk$dataset <- "Balance Scale"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with orthogonal partititions
+```{r balance-forest-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#select dataset
+df <- BalanceScale
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(Class ~ ., data = train_df)
+  pred.junk <- predict(junk, newdata=test_df, type = "response")
+  test_class[k] <- sum(pred.junk == test_df$Class)/length(pred.junk)*100
+  pred.junk <- predict(junk, newdata = train_df, type = "response")
+  train_class[k] <- sum(pred.junk == train_df$Class)/length(pred.junk)*100
+  tree_size[k]<- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Balance Scale",
+                            method = "Random Forest",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r balance-time-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(Class ~., data = df, ntree = 50),
+  times = 50
+)
+junk$dataset <- "Balance Scale"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Precalculate basis functions
+```{r balance-basis-precalculation, echo = FALSE, echo = FALSE}
+#Precalculate interactive basis functions
+df <- mutate(df,
+             LWpLD=LW+LD,LWpRW=LW+RW,LWpRD=LW+RD,LDpRW=LD+RW,LDpRD=LD+RD,RWpRD=RW+RD,
+             LWxLD=LW*LD,LWxRW=LW*RW,LWxRD=LW*RD,LDxRW=LD*RW,LDxRD=LD*RD,RWxRD=RW*RD,
+             LWcLD=LW^2+LD^2,LWxRW=LW^2+RW^2,LWcRD=LW^2+RD^2,LDcRW=LD^2+RW^2,LDcRD=LD^2+RD^2,RWcRD=RW^2+RD^2,
+             LWeLD=LW*exp(LD),LWeRW=LW*exp(RW),LWeRD=LW*exp(RD),LDeRW=LD*exp(RW),LDeRD=LD*exp(RD),RWeRD=RW*exp(RD))
+```
+
+### Conventional tree with basis functions
+```{r balance-cross-validation-basis-balance, echo = FALSE, echo = FALSE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(Class ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$Class)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$Class)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <-rbind(class.results,
+                              data.frame(dataset = "Balance Scale", 
+                                         method = "Tree",
+                                         bf="IBF", 
+                                         train_class, test_class,tree_size))
+```
+
+### Time benchmark
+```{r balance-time-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  Tree = tree(Class ~., data = df),
+  times = 50
+)
+junk$dataset <- "Balance Scale"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with basis functions
+```{r balance-ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(Class ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Class)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Class)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Balance Scale",
+                            method = "Evolutionary Tree",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r balance-time-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(Class ~., data = df),
+  times = 50
+)
+junk$dataset <- "Balance Scale"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with basis functions
+```{r balance-forest-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(Class ~ ., data = train_df)
+  pred.junk <- predict(junk, newdata=test_df, type = "response")
+  test_class[k] <- sum(pred.junk == test_df$Class)/length(pred.junk)*100
+  pred.junk <- predict(junk, newdata = train_df, type = "response")
+  train_class[k] <- sum(pred.junk == train_df$Class)/length(pred.junk)*100
+  tree_size[k]<- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Balance Scale",
+                            method = "Random Forest",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r balance-forest-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(Class ~., data = df),
+  times = 50
+)
+junk$dataset <- "Balance Scale"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+## Wine
+
+### Conventional tree with orthogonal partititions
+```{r wine-cross-validation-orthogonal, echo = FALSE}
+#select dataset
+df <- wine
+df$Proline <- wine$Proline
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(Type ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k] <- sum(junk$frame$var=="<leaf>")
+}
+class.results <-rbind(class.results, data.frame(dataset = "Wine",
+                                method = "Tree",
+                                bf="Orthogonal",
+                                train_class,test_class,tree_size))
+```
+
+### Time benchmark
+```{r wine-time-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  Tree = tree(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Wine"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with orthogonal partitions
+```{r wine-ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(Type ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Wine",
+                            method = "Evolutionary Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+```{r wine-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Wine"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with orthogonal partitions
+```{r wine-forest-cross-validation-orthogonal, echo = FALSE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(Type ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <-rbind(class.results, data.frame(dataset = "Wine",
+                                method = "Random Forest",
+                                bf="Orthogonal",
+                                train_class,test_class,tree_size))
+```
+
+### Time benchmark
+```{r wine-forest-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Wine"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Precalculate basis functions
+```{r wine-basis-precalculation, echo = FALSE}
+#Precalculate pairwise basis functions
+df <- mutate(df,FlpC=Flavanoids+Color,FlpM=Flavanoids+Color,FlpP=Flavanoids+Proline,FlpA=Flavanoids+Alcohol,CpM=Color+Malic,CpP=Color+Proline,CpA=Color+Alcohol,MpP=Malic+Proline,MpA=Malic+Alcohol,PpA=Proline+Alcohol,
+             FlxC=Flavanoids*Color,FlxM=Flavanoids*Color,FlxP=Flavanoids*Proline,FlxA=Flavanoids*Alcohol,CxM=Color*Malic,CxP=Color*Proline,CxA=Color*Alcohol,MxP=Malic*Proline,MxA=Malic*Alcohol,PxA=Proline*Alcohol,
+             FlcC=Flavanoids^2+Color^2,FlcM=Flavanoids^2+Color^2,FlcP=Flavanoids^2+Proline^2,FlcA=Flavanoids^2+Alcohol^2,CcM=Color^2+Malic^2,CcP=Color^2+Proline^2,CcA=Color^2+Alcohol^2,McP=Malic^2+Proline^2,McA=Malic^2+Alcohol^2,PcA=Proline^2+Alcohol^2,
+             FleC=Flavanoids*exp(Color),FleM=Flavanoids*exp(Color),FleP=Flavanoids*exp(Proline),FleA=Flavanoids*exp(Alcohol),CeM=Color*exp(Malic),CeP=Color*exp(Proline),CeA=Color*exp(Alcohol),MeP=Malic*exp(Proline),MeA=Malic*exp(Alcohol),PeA=Proline*exp(Alcohol))
+
+```
+
+### Conventional tree with basis functions
+```{r wine-cross-validation-basis, cache = TRUE, echo = FALSE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(Type ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k] <- sum(junk$frame$var=="<leaf>")
+}
+class.results <-rbind(class.results,
+                      data.frame(dataset = "Wine",
+                                 method = "Tree",
+                                 bf="IBF",
+                                 train_class,test_class,tree_size))
+```
+
+### Time benchmark
+```{r wine-time-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  Tree = tree(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Wine"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with basis functions
+```{r wine-ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(Type ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k] <- width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Wine",
+                            method = "Evolutionary Tree",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r wine-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Wine"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with basis functions
+```{r wine-forest-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(Type ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Wine",
+                            method = "Random Forest",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r wine-forest-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Wine"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+## BUPA
+
+### Conventional tree with orthogonal partitions
+```{r bupa-cross-validation-orthogonal, echo = FALSE}
+#select dataset
+df <- bupa
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(V7 ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$V7)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$V7)/length(pred.junk)*100
+  tree_size[k] <- sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                        data.frame(dataset = "BUPA",
+                                   method = "Tree",
+                                   bf="Orthogonal",
+                                   train_class,test_class,tree_size))
+```
+
+### Time benchmark
+```{r bupa-time-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  Tree = tree(V7 ~., data = df),
+  times = 50
+)
+junk$dataset <- "BUPA"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with orthogonal partitions
+```{r bupa-ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(V7 ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$V7)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$V7)/length(pred.junk)*100
+  tree_size[k] <- width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BUPA",
+                            method = "Evolutionary Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r bupa-time-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(V7 ~., data = df),
+  times = 50
+)
+junk$dataset <- "BUPA"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with orthogonal partitions
+```{r bupa-forest-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(V7 ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$V7)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$V7)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BUPA",
+                            method = "Random Forest",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r bupa-time-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(V7 ~., data = df),
+  times = 50
+)
+junk$dataset <- "BUPA"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Precalculate basis functions
+```{r bupa-basis-precalculation, echo = FALSE}
+#Precalculate pairwise basis functions
+df <- mutate(df,V1pV2=V1+V2,V1pV3=V1+V3,V1pV4=V1+V4,V1pV5=V1+V5,V1pV6=V1+V6,V2pV3=V2+V3,V2pV4=V2+V4,V2pV5=V2+V5,V2pV6=V2+V6,V3pV4=V3+V4,V3pV5=V3+V5,V3pV6=V3+V6,V4pV5=V4+V5,V4pV6=V4+V6,V5pV6=V5+V6,
+             V1xV2=V1*V2,V1xV3=V1*V3,V1xV4=V1*V4,V1xV5=V1*V5,V1xV6=V1*V6,V2xV3=V2*V3,V2xV4=V2*V4,V2xV5=V2*V5,V2xV6=V2*V6,V3xV4=V3*V4,V3xV5=V3*V5,V3xV6=V3*V6,V4xV5=V4*V5,V4xV6=V4*V6,V5xV6=V5*V6,
+             V1cV2=V1^2+V2^2,V1cV3=V1^2+V3^2,V1cV4=V1^2+V4^2,V1cV5=V1^2+V5^2,V1cV6=V1^2+V6^2,V2cV3=V2^2+V3^2,V2cV4=V2^2+V4^2,V2cV5=V2^2+V5^2,V2cV6=V2^2+V6^2,V3cV4=V3^2+V4^2,V3cV5=V3^2+V5^2,V3cV6=V3^2+V6^2,V4cV5=V4^2+V5^2,V4cV6=V4^2+V6^2,V5cV6=V5^2+V6^2,
+             V1eV2=V1*exp(V2),V1eV3=V1*exp(V3),V1eV4=V1*exp(V4),V1eV5=V1*exp(V5),V1eV6=V1*exp(V6),V2eV3=V2*exp(V3),V2eV4=V2*exp(V4),V2eV5=V2*exp(V5),V2eV6=V2*exp(V6),V3eV4=V3*exp(V4),V3eV5=V3*exp(V5),V3eV6=V3*exp(V6),V4eV5=V4*exp(V5),V4eV6=V4*exp(V6),V5eV6=V5*exp(V6))
+```
+
+### Conventional tree with basis functions
+```{r bupa-cross-validation-basis, echo = FALSE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(V7 ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$V7)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$V7)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <-rbind(class.results,
+                      data.frame(dataset = "BUPA",
+                                 method = "Tree",
+                                 bf="IBF",
+                                 train_class,test_class,tree_size))
+
+```
+
+# Time benchmark
+```{r bupa-time-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  Tree = tree(V7 ~., data = df),
+  times = 50
+)
+junk$dataset <- "BUPA"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with basis functions
+```{r bupa-ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(V7 ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$V7)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$V7)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BUPA",
+                            method = "Evolutionary Tree",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r bupa-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(V7 ~., data = df),
+  times = 50
+)
+junk$dataset <- "BUPA"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with basis functions
+```{r bupa-forest-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(V7 ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$V7)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$V7)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BUPA",
+                            method = "Random Forest",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r bupa-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(V7 ~., data = df),
+  times = 50
+)
+junk$dataset <- "BUPA"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+## PIMA
+
+### Conventional tree with orthogonal partititions
+```{r pima-cross-validation-orthogonal, echo = FALSE}
+#select dataset
+df <- PimaIndiansDiabetes
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(diabetes ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$diabetes)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$diabetes)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "PIMA",
+                                  method = "Tree",
+                                  bf="Orthogonal",
+                                  train_class,test_class,tree_size))
+```
+
+### Time benchmark
+```{r pima-time-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+junk = microbenchmark(
+  Tree = tree(diabetes ~., data = df),
+  times = 50
+)
+junk$dataset <- "PIMA"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with orthogonal partitions
+```{r pima-ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(diabetes ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$diabetes)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$diabetes)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "PIMA",
+                            method = "Evolutionary Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r pima-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(diabetes ~., data = df),
+  times = 50
+)
+junk$dataset <- "PIMA"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with orthogonal partitions
+```{r pima-forest-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(diabetes ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$diabetes)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$diabetes)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "PIMA",
+                            method = "Random Forest",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r pima-forest-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(diabetes ~., data = df),
+  times = 50
+)
+junk$dataset <- "PIMA"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Precalculate basis functions
+```{r pima-basis-precalculation, echo = FALSE}
+#Precalculate pairwise basis functions
+df <- mutate(df,GpA=glucose+age,GpM=glucose+mass,GpP=glucose+pedigree,GpPr=glucose+pregnant,
+             ApM=age+mass,ApP=age+pedigree,ApPr=age+pregnant,
+             MpP=mass+pedigree,MpPr=mass+pregnant,
+             PpPr=pedigree+pregnant,
+             GxA=glucose*age,GxM=glucose*mass,GxP=glucose*pedigree,GxPr=glucose*pregnant,
+             AxM=age*mass,AxP=age*pedigree,AxPr=age*pregnant,
+             MxP=mass*pedigree,MxPr=mass*pregnant,
+             PxPr=pedigree*pregnant,
+             GcA=glucose^2+age^2,GcM=glucose^2+mass^2,GcP=glucose^2+pedigree^2,GcPr=glucose^2+pregnant^2,
+             AcM=age^2+mass^2,AcP=age^2+pedigree^2,AcPr=age^2+pregnant^2,
+             McP=mass^2+pedigree^2,McPr=mass^2+pregnant^2,
+             PcPr=pedigree^2+pregnant^2,
+             GeA=glucose*exp(age),GeM=glucose*exp(mass),GeP=glucose*exp(pedigree),GePr=glucose*exp(pregnant),
+             AeM=age*exp(mass),AeP=age*exp(pedigree),AePr=age*exp(pregnant),
+             MeP=mass*exp(pedigree),MePr=mass*exp(pregnant),
+             PePr=pedigree*exp(pregnant))
+```
+
+### Conventional tree with basis functions
+```{r pima-cross-validation-basis, echo = FALSE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(diabetes ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$diabetes)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$diabetes)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <-rbind(class.results,
+                      data.frame(dataset = "PIMA",
+                                 method = "Tree",
+                                 bf="IBF",
+                                 train_class,test_class,tree_size))
+
+```
+
+### Time benchmark
+```{r pima-time-benchmark-basis, cache = TRUE, echo = FALSE}
+junk = microbenchmark(
+  Tree = tree(diabetes ~., data = df),
+  times = 50
+)
+junk$dataset <- "PIMA"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Evoutionary tree with basis functions
+```{r pima-ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(diabetes ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$diabetes)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$diabetes)/length(pred.junk)*100
+  tree_size[k] <- width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "PIMA",
+                            method = "Evolutionary Tree",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark 
+```{r pima-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(diabetes ~., data = df),
+  times = 50
+)
+junk$dataset <- "PIMA"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with basis functions
+```{r pima-forest-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(diabetes ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$diabetes)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$diabetes)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "PIMA",
+                            method = "Random Forest",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark 
+```{r pima-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(diabetes ~., data = df),
+  times = 50
+)
+junk$dataset <- "PIMA"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+## Glass
+
+### Conventional tree with orthogonal partitions
+```{r glass-cross-validation-orthogonal, echo = FALSE}
+#select dataset
+df <- Glass
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(Type ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k] <- sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Glass",
+                                  method = "Tree",
+                                  bf="Orthogonal",
+                                  train_class,test_class,tree_size))
+```
+
+### Time benchmark
+```{r glass-time-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+junk = microbenchmark(
+  Tree = tree(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Glass"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with orthogonal partitions
+```{r glass-ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(Type ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k] <- width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Glass",
+                            method = "Evolutionary Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r glass-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Glass"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with orthogonal partitions
+```{r glass-forest-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(Type ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Glass",
+                            method = "Random Forest",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r glass-forest-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Glass"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Precalculate basis functions
+```{r glass-basis-precalculation, echo = FALSE}
+#Precalculate pairwise basis functions
+df <- mutate(df,RIpNa=RI+Na,RIpMg=RI+Mg,RIpAl=RI+Al,RIpSi=RI+Si,RIpK=RI+K,RIpCa=RI+Ca,RIpBa=RI+Ba,RIpFe=RI+Fe,
+             NapMg=Na+Mg,NapAl=Na+Al,NapSi=Na+Si,NapK=Na+K,NapCa=Na+Ca,NapBa=Na+Ba,NapFe=Na+Fe,
+             MgpAl=Mg+Al,MgpSie=Mg+Si,MgpK=Mg+K,MgpCa=Mg+Ca,MgpBa=Mg+Ba,MgpFe=Mg+Fe,
+             AlpSi=Al+Si,AlpK=Al+K,AlpCa=Al+Ca,AlpBa=Al+Ba,AlpFe=Al+Fe,
+             SipK=Si+K,SipCa=Si+Ca,SipBa=Si+Ba,SipFe=Si+Fe,
+             KpCa=K+Ca,KpBa=K+Ba,KpFe=K+Fe,
+             CapBa=Ca+Ba,CapFe=Ca+Fe,
+             BapFe=Ba+Fe,
+             RIxNa=RI*Na,RIxMg=RI*Mg,RIxAl=RI*Al,RIxSi=RI*Si,RIxK=RI*K,RIxCa=RI*Ca,RIxBa=RI*Ba,RIxFe=RI*Fe,
+             NaxMg=Na*Mg,NaxAl=Na*Al,NaxSi=Na*Si,NaxK=Na*K,NaxCa=Na*Ca,NaxBa=Na*Ba,NaxFe=Na*Fe,
+             MgxAl=Mg*Al,MgxSi=Mg*Si,MgxK=Mg*K,MgxCa=Mg*Ca,MgxBa=Mg*Ba,MgxFe=Mg*Fe,
+             AlxSi=Al*Si,AlxK=Al*K,AlxCa=Al*Ca,AlxBa=Al*Ba,AlxFe=Al*Fe,
+             SixK=Si*K,SixCa=Si*Ca,SixBa=Si*Ba,SixFe=Si*Fe,
+             KxCa=K*Ca,KxBa=K*Ba,KxFe=K*Fe,
+             CaxBa=Ca*Ba,CaxFe=Ca*Fe,
+             BaxFe=Ba*Fe,
+             RIcNa=RI^2+Na^2,RIcMg=RI^2+Mg^2,RIcAl=RI^2+Al^2,RIcSi=RI^2+Si^2,RIcK=RI^2+K^2,RIcCa=RI^2+Ca^2,RIcBa=RI^2+Ba^2,RIcFe=RI^2+Fe^2,
+             NacMg=Na^2+Mg^2,NacAl=Na^2+Al^2,NacSi=Na^2+Si^2,NacK=Na^2+K^2,NacCa=Na^2+Ca^2,NacBa=Na^2+Ba^2,NacFe=Na^2+Fe^2,
+             MgcAl=Mg^2+Al^2,MgcSi=Mg^2+Si^2,MgcK=Mg^2+K^2,MgcCa=Mg^2+Ca^2,MgcBa=Mg^2+Ba^2,MgcFe=Mg^2+Fe^2,
+             AlcSi=Al^2+Si^2,AlcK=Al^2+K^2,AlcCa=Al^2+Ca^2,AlcBa=Al^2+Ba^2,AlcFe=Al^2+Fe^2,
+             SicK=Si^2+K^2,SicCa=Si^2+Ca^2,SicBa=Si^2+Ba^2,SicFe=Si^2+Fe^2,
+             KcCa=K^2+Ca^2,KcBa=K^2+Ba^2,KcFe=K^2+Fe^2,
+             CacBa=Ca^2+Ba^2,CacFe=Ca^2+Fe^2,
+             BacFe=Ba^2+Fe^2,
+             RIeNa=RI*exp(Na),RIeMg=RI*exp(Mg),RIeAl=RI*exp(Al),RIeSi=RI*exp(Si),RIeK=RI*exp(K),RIeCa=RI*exp(Ca),RIeBa=RI*exp(Ba),RIeFe=RI*exp(Fe),
+             NaeMg=Na*exp(Mg),NaeAl=Na*exp(Al),NaeSi=Na*exp(Si),NaeK=Na*exp(K),NaeCa=Na*exp(Ca),NaeBa=Na*exp(Ba),NaeFe=Na*exp(Fe),
+             MgeAl=Mg*exp(Al),MgeSi=Mg*exp(Si),MgeK=Mg*exp(K),MgeCa=Mg*exp(Ca),MgeBa=Mg*exp(Ba),MgeFe=Mg*exp(Fe),
+             AleSi=Al*exp(Si),AleK=Al*exp(K),AleCa=Al*exp(Ca),AleBa=Al*exp(Ba),AleFe=Al*exp(Fe),
+             SieK=Si*exp(K),SieCa=Si*exp(Ca),SieBa=Si*exp(Ba),SieFe=Si*exp(Fe),
+             KeCa=K*exp(Ca),KeBa=K*exp(Ba),KeFe=K*exp(Fe),
+             CaeBa=Ca*exp(Ba),CaeFe=Ca*exp(Fe),
+             BaeFe=Ba*exp(Fe))
+```
+
+### Conventional tree with basis functions
+```{r glass-cross-validation-basis, echo = FALSE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(Type ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <-rbind(class.results,
+                      data.frame(dataset = "Glass",
+                                 method = "Tree",
+                                 bf="IBF",
+                                 train_class,test_class,tree_size))
+
+```
+
+### Time benchmark
+```{r glass-time-benchmark-ibf, cache = TRUE, echo = FALSE}
+junk = microbenchmark(
+  Tree = tree(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Glass"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with basis functions
+```{r glass-ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(Type ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Glass",
+                            method = "Evolutionary Tree",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r glass-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Glass"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with basis functions
+```{r glass-forest-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(Type ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Type)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Type)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Glass",
+                            method = "Random Forest",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r glass-forest-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(Type ~., data = df),
+  times = 50
+)
+junk$dataset <- "Glass"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+## BBB Club
+
+### Conventional tree with orthogonal partitions
+```{r bbbclub-cross-validation-orthogonal}
+#select dataset
+df <- BBBClub
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(choice ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$choice)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$choice)/length(pred.junk)*100
+  tree_size[k] <- sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BBBClub",
+                                  method = "Tree",
+                                  bf="Orthogonal",
+                                  train_class,test_class,tree_size))
+```
+
+### Time benchmark
+```{r bbbclub-time-benchmark-orthogonal, cache = TRUE}
+junk = microbenchmark(
+  Tree = tree(choice ~., data = df),
+  times = 50
+)
+junk$dataset <- "BBBClub"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with orthogonal partitions
+```{r bbbclub-ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(choice ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$choice)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$choice)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BBBClub",
+                            method = "Evolutionary Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r bbbclub-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(choice ~., data = df),
+  times = 50
+)
+junk$dataset <- "BBBClub"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with orthogonal partitions
+```{r bbbclub-forest-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(choice ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$choice)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$choice)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BBBClub",
+                            method = "Random Forest",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r bbbclub-forest-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(choice ~., data = df),
+  times = 50
+)
+junk$dataset <- "BBBClub"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+### Precalculate basis functions
+```{r bbbclub-basis-precalculation}
+#Precalculate pairwise basis functions
+df <- mutate(df,ApFq=art+freq,ApF=art+first,FqpF=freq+first,
+             AxFq=art*freq,AxF=art*first,FqxF=freq*first,
+             AcFq=art^2+freq^2,AcF=art^2+first^2,FqcF=freq^2+first^2,
+             AeFq=art*exp(freq),AeF=art*exp(first),FqeF=freq*exp(first))
+```
+
+### Conventional tree with basis functions
+```{r bbbclub-cross-validation-basis}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(choice ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$choice)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$choice)/length(pred.junk)*100
+  tree_size[k] <- sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BBBClub",
+                                  method = "Tree",
+                                  bf="IBF",
+                                  train_class,test_class,tree_size))
+```
+
+### Time benchmark
+```{r bbbclub-time-benchmark-basis, cache = TRUE}
+junk = microbenchmark(
+  Tree = tree(choice ~., data = df),
+  times = 50
+)
+junk$dataset <- "BBBClub"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Evolutionary tree with basis functions
+```{r bbbclub-ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(choice ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$choice)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$choice)/length(pred.junk)*100
+  tree_size[k] <- width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BBBClub",
+                            method = "Evolutionary Tree",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r bbbclub-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(choice ~., data = df),
+  times = 50
+)
+junk$dataset <- "BBBClub"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+### Random forest with basis functions
+```{r bbbclub-forest-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- randomForest(choice ~., data = train_df)
+  pred.junk <- predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$choice)/length(pred.junk)*100
+  pred.junk <- predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$choice)/length(pred.junk)*100
+  tree_size[k] <- 500
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "BBBClub",
+                            method = "Random Forest",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+### Time benchmark
+```{r bbbclub-forest-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  randomForest = randomForest(choice ~., data = df),
+  times = 50
+)
+junk$dataset <- "BBBClub"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+## Results and plots
+
+```{r performance-benchmark-train-results, echo=FALSE, fig.cap="\\label{fig:performance-benchmark-results-train}Results of performance benchmarking", fig.height=8, fig.show='asis'}
+ggplot(data = class.results, aes(x = method, y = train_class, fill = bf)) +
+  geom_boxplot() +
+  ylab("Accuracy (%)") +
+  facet_wrap(~dataset, nrow = 3, ncol = 3)
+```
+
+```{r performance-benchmark-test-results, echo=FALSE, fig.cap="\\label{fig:performance-benchmark-results-train}Results of performance benchmarking", fig.height=8, fig.show='asis'}
+ggplot(data = class.results, aes(x = method, y = test_class, fill = bf)) +
+  geom_boxplot() +
+  ylab("Accuracy (%)") +
+  facet_wrap(~dataset, nrow = 3, ncol = 3)
+```
+
+```{r performance-benchmark-size-results, echo=FALSE, fig.cap="\\label{fig:performance-benchmark-size-results}Results of performance benchmarking", fig.height=8, fig.show='asis'}
+ggplot(data = class.results, aes(x = method, y = tree_size, fill = bf)) +
+  geom_boxplot() +
+  ylab("Tree Size") +
+  facet_wrap(~dataset, nrow = 3, ncol = 3)
+```
+
+```{r time-benchmark-results, echo=FALSE, fig.cap="\\label{fig:time-benchmark-results}Results of computing time benchmarking", fig.height=8, fig.show='asis'}
+ggplot(data = mbm, aes(x = expr, y = time, fill = bf)) + 
+  geom_boxplot() + 
+  ylab("Time (ms)") +
+  facet_wrap(~ dataset, nrow = 3, ncol = 3)
+```
+
+
+# Save results
+
+```{r}
+save(class.results, mbm, file = "Benchmarking Results.RData")
+```
+
+
+# Additional Datasets!
+
+## Boston housing
+
+```{r boston-cross-validation-orthogonal, echo = FALSE}
+#select dataset
+df<-BostonHousing
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(chas ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$chas)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$chas)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                         data.frame(dataset = "Boston Housing",
+                                    method = "Tree",
+                                    bf="Orthogonal",
+                                    train_class,test_class,tree_size))
+```
+
+```{r boston-time-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  Tree = tree(chas ~., data = df),
+  times = 50
+)
+junk$dataset <- "Boston"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+
+```{r boston-ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(chas ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$chas)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$chas)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Boston Housing",
+                            method = "Evolutionary Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+```{r boston-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(chas ~., data = df),
+  times = 50
+)
+junk$dataset <- "Boston Housing"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+```{r boston-basis-precalculation, echo = FALSE}
+#Precalculate pairwise basis functions
+df <- mutate(df,CpZ=crim+zn,CpI=crim+indus,CpN=crim+nox,CpR=crim+rm,CpA=crim+age,CpP=crim+ptratio,CpB=crim+b,CpL=crim+lstat,CpM=crim+medv,
+             ZpI=zn+indus,ZpN=zn+nox,ZpR=zn+rm,ZpA=zn+age,ZpP=zn+ptratio,ZpB=zn+b,ZpL=zn+lstat,ZpM=zn+medv,
+             IpN=indus+nox,IpR=indus+rm,IpA=indus+age,IpP=indus+ptratio,IpB=indus+b,IpL=indus+lstat,IpM=indus+medv,
+             NpR=nox+rm,NpA=nox+age,NpP=nox+ptratio,NpB=nox+b,NpL=nox+lstat,NpM=nox+medv,
+             RpA=rm+age,RpP=rm+ptratio,RpB=rm+b,RpL=rm+lstat,RpM=rm+medv,
+             ApP=age+ptratio,ApB=age+b,ApL=age+lstat,ApM=age+medv,
+             PpB=ptratio+b,PpL=ptratio+lstat,PpM=ptratio+medv,
+             BpL=b+lstat,BpM=b+medv,
+             LpM=lstat+medv,
+             CxZ=crim*zn,CxI=crim*indus,CxN=crim*nox,CxR=crim*rm,CxA=crim*age,CxP=crim*ptratio,CxB=crim*b,CxL=crim*lstat,CxM=crim*medv,
+             ZxI=zn*indus,ZxN=zn*nox,ZxR=zn*rm,ZxA=zn*age,ZxP=zn*ptratio,ZxB=zn*b,ZxL=zn*lstat,ZxM=zn*medv,
+             IxN=indus*nox,IxR=indus*rm,IxA=indus*age,IxP=indus*ptratio,IxB=indus*b,IxL=indus*lstat,IxM=indus*medv,
+             NxR=nox*rm,NxA=nox*age,NxP=nox*ptratio,NxB=nox*b,NxL=nox*lstat,NxM=nox*medv,
+             RxA=rm*age,RxP=rm*ptratio,RxB=rm*b,RxL=rm*lstat,RxM=rm*medv,
+             AxP=age*ptratio,AxB=age*b,AxL=age*lstat,AxM=age*medv,
+             PxB=ptratio*b,PxL=ptratio*lstat,PxM=ptratio*medv,
+             BxL=b*lstat,BxM=b*medv,
+             LxM=lstat*medv,
+             CcZ=crim^2+zn^2,CcI=crim^2+indus^2,CcN=crim^2+nox^2,CcR=crim^2+rm^2,CcA=crim^2+age^2,CcP=crim^2+ptratio^2,CcB=crim^2+b^2,CcL=crim^2+lstat^2,CcM=crim^2+medv^2,
+             ZcI=zn^2+indus^2,ZcN=zn^2+nox^2,ZcR=zn^2+rm^2,ZcA=zn^2+age^2,ZcP=zn^2+ptratio^2,ZcB=zn^2+b^2,ZcL=zn^2+lstat^2,ZcM=zn^2+medv^2,
+             IcN=indus^2+nox^2,IcR=indus^2+rm^2,IcA=indus^2+age^2,IcP=indus^2+ptratio^2,IcB=indus^2+b^2,IcL=indus^2+lstat^2,IcM=indus^2+medv^2,
+             NcR=nox^2+rm^2,NcA=nox^2+age^2,NcP=nox^2+ptratio^2,NcB=nox^2+b^2,NcL=nox^2+lstat^2,NcM=nox^2+medv^2,
+             RcA=rm^2+age^2,RcP=rm^2+ptratio^2,RcB=rm^2+b^2,RcL=rm^2+lstat^2,RcM=rm^2+medv^2,
+             AcP=age^2+ptratio^2,AcB=age^2+b^2,AcL=age^2+lstat^2,AcM=age^2+medv^2,
+             PcB=ptratio^2+b^2,PcL=ptratio^2+lstat^2,PcM=ptratio^2+medv^2,
+             BcL=b^2+lstat^2,BcM=b^2+medv^2,
+             LcM=lstat^2+medv^2,
+             CeZ=crim*exp(zn),CeI=crim*exp(indus),CeN=crim*exp(nox),CeR=crim*exp(rm),CeA=crim*exp(age),CeP=crim*exp(ptratio),CeB=crim*exp(b),CeL=crim*exp(lstat),CeM=crim*exp(medv),
+             ZeI=zn*exp(indus),ZeN=zn*exp(nox),ZeR=zn*exp(rm),ZeA=zn*exp(age),ZeP=zn*exp(ptratio),ZeB=zn*exp(b),ZeL=zn*exp(lstat),ZeM=zn*exp(medv),
+             IeN=indus*exp(nox),IeR=indus*exp(rm),IeA=indus*exp(age),IeP=indus*exp(ptratio),IeB=indus*exp(b),IeL=indus*exp(lstat),IeM=indus*exp(medv),
+             NeR=nox*exp(rm),NeA=nox*exp(age),NeP=nox*exp(ptratio),NeB=nox*exp(b),NeL=nox*exp(lstat),NeM=nox*exp(medv),
+             ReA=rm*exp(age),ReP=rm*exp(ptratio),ReB=rm*exp(b),ReL=rm*exp(lstat),ReM=rm*exp(medv),
+             AeP=age*exp(ptratio),AeB=age*exp(b),AeL=age*exp(lstat),AeM=age*exp(medv),
+             PeB=ptratio*exp(b),PeL=ptratio*exp(lstat),PeM=ptratio*exp(medv),
+             BeL=b*exp(lstat),BeM=b*exp(medv),
+             LeM=lstat*exp(medv))
+```
+
+```{r boston-cross-validation-basis, cache = TRUE, echo = FALSE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(chas ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$chas)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$chas)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <-rbind(class.results,
+                      data.frame(dataset = "Boston Housing",
+                                 method = "Tree",
+                                 bf="IBF",
+                                 train_class,test_class,tree_size))
+```
+
+```{r boston-time-benchmark-basis, cache = TRUE, echo = FALSE}
+junk = microbenchmark(
+  Tree = tree(chas ~., data = df),
+  times = 50
+)
+junk$dataset <- "Boston"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+
+```{r boston-ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(chas ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$chas)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$chas)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Boston",
+                            method = "Evolutionary Tree",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+```{r boston-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(chas ~., data = df),
+  times = 50
+)
+junk$dataset <- "Boston"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+
+## Shuttle (Large dataset)
+
+```{r shuttle-cross-validation-orthogonal, echo = FALSE}
+#select dataset
+df <- Shuttle
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(Class ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$Class)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$Class)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Shuttle",
+                                  method = "Tree",
+                                  bf="Orthogonal",
+                                  train_class,test_class,tree_size))
+```
+
+```{r shuttle-time-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+junk = microbenchmark(
+  Tree = tree(Class ~., data = df),
+  times = 50
+)
+junk$dataset <- "Shuttle"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+
+```{r shuttle-ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(Class ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Class)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Class)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Shuttle",
+                            method = "Evolutionary Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+```{r shuttle-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(V7 ~., data = df),
+  times = 50
+)
+junk$dataset <- "Shuttle"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+```{r shuttle-basis-precalculation, echo = FALSE}
+#Precalculate pairwise basis functions
+df <- mutate(df,V1pV2=V1+V2,V1pV9=V1+V9,V2pV9=V2+V9,
+             V1xV2=V1*V2,V1XV9=V1*V9,V2xV9=V2*V9,
+             V1cV2=V1^2+V2^2,V1cV9=V1^2+V9^2,V2cV9=V2^2+V9^2,
+             V1eV2=V1*exp(V2),V1eV9=V1*exp(V9),V2eV9=V2*exp(V9))
+```
+
+```{r shuttle-cross-validation-basis, echo = FALSE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(Class ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$Class)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$Class)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Shuttle",
+                                  method = "Tree",
+                                  bf="IBF",
+                                  train_class,test_class,tree_size))
+
+```
+
+```{r shuttle-time-benchmark-basis, cache = TRUE, echo = FALSE}
+junk = microbenchmark(
+  Tree = tree(Class ~., data = df),
+  times = 50
+)
+junk$dataset <- "Shuttle"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+
+```{r shuttle-ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(Class ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$Class)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$Class)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Shuttle",
+                            method = "Evolutionary Tree",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+```{r shuttle-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(Class ~., data = df),
+  times = 50
+)
+junk$dataset <- "Shuttle"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+## Letter recognintion (large dataset)
+
+```{r letter-cross-validation-orthogonal, echo = FALSE}
+#select dataset
+df <- LetterRecognition
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(lettr ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$lettr)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$lettr)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                       data.frame(
+                         dataset = "Letter Recognition",
+                         method = "Tree",
+                         bf="Orthogonal",
+                         train_class,test_class,tree_size))
+```
+
+```{r letter-time-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+junk = microbenchmark(
+  Tree = tree(lettr ~., data = df),
+  times = 50
+)
+junk$dataset <- "Letter Recognition"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+
+```{r letter-ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(lettr ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$letter)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$letter)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Letter Recognition",
+                            method = "Evolutionary Tree",
+                            bf = "Orthogonal", 
+                            train_class, test_class, tree_size))
+```
+
+```{r letter-ev-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(lettr ~., data = df),
+  times = 50
+)
+junk$dataset <- "Letter Recognition"
+junk$bf <- "Orthogonal"
+mbm <- rbind(mbm, junk)
+```
+
+```{r letter-basis-precalculation, echo = FALSE}
+#Precalculate pairwise basis functions
+df <- mutate(df,YegepXege=y.ege+x.ege,YegepYbar=y.ege+y.bar,YegepX2ybr=y.ege+x2ybr,YegepXegvy=y.ege+xegvy,YegepXy2br=y.ege+xy2br,YegepX2bar=y.ege+x2bar,
+             XegepYbar=x.ege+y.bar,XegepX2ybr=x.ege+x2ybr,XegepXegvy=x.ege+xegvy,XegepXy2br=x.ege+xy2br,XegepX2bar=x.ege+x2bar,
+             Ybar2pybr=y.bar+x2ybr,YbarpXegvy=y.bar+xegvy,YbarpXy2br=y.bar+xy2br,YbarpX2bar=y.bar+x2bar,
+             X2ybrpXegvy=x2ybr+xegvy,X2ybrpXy2br=x2ybr+xy2br,X2ybrpX2bar=x2ybr+x2bar,
+             XegvypXy2br=xegvy+xy2br,XegvypX2bar=xegvy+x2bar,
+             Xy2brpX2bar=xy2br+x2bar,
+             YegexXege=y.ege*x.ege,YegexYbar=y.ege*y.bar,YegexX2ybr=y.ege*x2ybr,YegexXegvy=y.ege*xegvy,YegexXy2br=y.ege*xy2br,YegexX2bar=y.ege*x2bar,
+             XegexYbar=x.ege*y.bar,XegexX2ybr=x.ege*x2ybr,XegexXegvy=x.ege*xegvy,XegexXy2br=x.ege*xy2br,XegexX2bar=x.ege*x2bar,
+             Ybar2xybr=y.bar*x2ybr,YbarxXegvy=y.bar*xegvy,YbarxXy2br=y.bar*xy2br,YbarxX2bar=y.bar*x2bar,
+             X2ybrxXegvy=x2ybr*xegvy,X2ybrxXy2br=x2ybr*xy2br,X2ybrxX2bar=x2ybr*x2bar,
+             XegvyxXy2br=xegvy*xy2br,XegvyxX2bar=xegvy*x2bar,
+             Xy2brxX2bar=xy2br*x2bar,
+             YegecXege=y.ege^2*x.ege^2,YegecYbar=y.ege^2*y.bar^2,YegecX2ybr=y.ege^2*x2ybr^2,YegecXegvy=y.ege^2*xegvy^2,YegecXy2br=y.ege^2*xy2br^2,YegecX2bar=y.ege^2*x2bar^2,
+             XegecYbar=x.ege^2*y.bar^2,XegecX2ybr=x.ege^2*x2ybr^2,XegecXegvy=x.ege^2*xegvy^2,XegecXy2br=x.ege^2*xy2br^2,XegecX2bar=x.ege^2*x2bar^2,
+             Ybar2cybr=y.bar^2*x2ybr^2,YbarcXegvy=y.bar^2*xegvy^2,YbarcXy2br=y.bar^2*xy2br^2,YbarcX2bar=y.bar^2*x2bar^2,
+             X2ybrcXegvy=x2ybr^2*xegvy^2,X2ybrcXy2br=x2ybr^2*xy2br^2,X2ybrcX2bar=x2ybr^2*x2bar^2,
+             XegvycXy2br=xegvy^2*xy2br^2,XegvycX2bar=xegvy^2*x2bar^2,
+             Xy2brcX2bar=xy2br^2*x2bar^2,
+             YegeeXege=y.ege*exp(x.ege),YegeeYbar=y.ege*exp(y.bar),YegeeX2ybr=y.ege*exp(x2ybr),YegeeXegvy=y.ege*exp(xegvy),YegeeXy2br=y.ege*exp(xy2br),YegeeX2bar=y.ege*exp(x2bar),
+             XegeeYbar=x.ege*exp(y.bar),XegeeX2ybr=x.ege*exp(x2ybr),XegeeXegvy=x.ege*exp(xegvy),XegeeXy2br=x.ege*exp(xy2br),XegeeX2bar=x.ege*exp(x2bar),
+             Ybar2eybr=y.bar*exp(x2ybr),YbareXegvy=y.bar*exp(xegvy),YbareXy2br=y.bar*exp(xy2br),YbareX2bar=y.bar*exp(x2bar),
+             X2ybreXegvy=x2ybr*exp(xegvy),X2ybreXy2br=x2ybr*exp(xy2br),X2ybreX2bar=x2ybr*exp(x2bar),
+             XegvyeXy2br=xegvy*exp(xy2br),XegvyeX2bar=xegvy*exp(x2bar),
+             Xy2breX2bar=xy2br*exp(x2bar))
+```
+
+```{r letter-cross-validation-basis}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- tree(lettr ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df,type = "class")
+  test_class[k] <- sum(pred.junk==test_df$lettr)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df,type = "class")
+  train_class[k] <- sum(pred.junk==train_df$lettr)/length(pred.junk)*100
+  tree_size[k]<-sum(junk$frame$var=="<leaf>")
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Letter Recognition",
+                                  method = "Tree",
+                                  bf="IBF",
+                                  train_class,test_class,tree_size))
+
+```
+
+```{r letter-time-benchmark-basis, cache = TRUE}
+junk = microbenchmark(
+  Tree = tree(lettr ~., data = df),
+  times = 50
+)
+junk$dataset <- "Letter Recognition"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+
+```{r letter-ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+#k-fold cross-validation
+folds_i <- sample(rep(1:n_folds, length.out = nrow(df)))
+#cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+test_class <-numeric()
+train_class <-numeric()
+tree_size <- numeric()
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_df <- df[-test_i, ]
+  test_df <- df[test_i, ]
+  junk <- evtree(lettr ~., data = train_df)
+  pred.junk<-predict(junk,newdata=test_df)
+  test_class[k] <- sum(pred.junk==test_df$lettr)/length(pred.junk)*100
+  pred.junk<-predict(junk,newdata=train_df)
+  train_class[k] <- sum(pred.junk==train_df$lettr)/length(pred.junk)*100
+  tree_size[k]<-width(junk)
+}
+class.results <- rbind(class.results,
+                       data.frame(dataset = "Letter Recognition",
+                            method = "Evolutionary Tree",
+                            bf = "IBF", 
+                            train_class, test_class, tree_size))
+```
+
+```{r letter-ev-benchmark-basis, cache = TRUE, echo = FALSE}
+#benchmark computer time
+junk = microbenchmark(
+  evtree = evtree(lettr ~., data = df),
+  times = 50
+)
+junk$dataset <- "Letter Recognition"
+junk$bf <- "IBF"
+mbm <- rbind(mbm, junk)
+```
+
+
+
+

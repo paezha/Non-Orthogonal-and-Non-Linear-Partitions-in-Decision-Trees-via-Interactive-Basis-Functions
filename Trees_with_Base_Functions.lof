@@ -1,0 +1,23 @@
+\contentsline {figure}{\numberline {1}{\ignorespaces Prototypical Decision Tree}}{20}{figure.1}
+\contentsline {figure}{\numberline {2}{\ignorespaces Chessboard example}}{21}{figure.2}
+\contentsline {figure}{\numberline {3}{\ignorespaces Example of a basis function used as a feature to train a Decision Tree}}{22}{figure.3}
+\contentsline {figure}{\numberline {4}{\ignorespaces Oblique basis function and projections with different splitting points (s)}}{23}{figure.4}
+\contentsline {figure}{\numberline {5}{\ignorespaces Hyperbolic basis function and projections with different splitting points (s)}}{24}{figure.5}
+\contentsline {figure}{\numberline {6}{\ignorespaces Radial IBF and projections with different splitting points (s)}}{25}{figure.6}
+\contentsline {figure}{\numberline {7}{\ignorespaces Behavior of radial IBF with non-centered/non-scaled variables (top panel) and centered/scaled variables (bottom panel)}}{26}{figure.7}
+\contentsline {figure}{\numberline {8}{\ignorespaces Benchmarking results: Classification accuracy}}{27}{figure.8}
+\contentsline {figure}{\numberline {9}{\ignorespaces Benchmarking results: Tree size}}{28}{figure.9}
+\contentsline {figure}{\numberline {10}{\ignorespaces Benchmarking results: Computing time}}{29}{figure.10}
+\contentsline {figure}{\numberline {11}{\ignorespaces Three ethnic groups in Newark (1880 US Census)}}{30}{figure.11}
+\contentsline {figure}{\numberline {12}{\ignorespaces Decisiton tree with orthogonal partitions for spatial classification, Newark ethnic groups}}{31}{figure.12}
+\contentsline {figure}{\numberline {13}{\ignorespaces Ethnic neighborhoods in Newark, 1880, using orthogonal partitions}}{32}{figure.13}
+\contentsline {figure}{\numberline {14}{\ignorespaces Decision tree with non-orthogonal/non-linear partitions for spatial classification, Newark ethnic groups}}{33}{figure.14}
+\contentsline {figure}{\numberline {15}{\ignorespaces Ethnic neighborhoods in Newark, 1880, using non-orthogonal partitions}}{34}{figure.15}
+\contentsline {figure}{\numberline {16}{\ignorespaces Land prices in Sapporo (log)}}{35}{figure.16}
+\contentsline {figure}{\numberline {17}{\ignorespaces Decision tree with orthogonal partitions for submarket identification, Sapporo land prices}}{36}{figure.17}
+\contentsline {figure}{\numberline {18}{\ignorespaces Spatial land price submarkets in Sapporo using orthogonal partitions}}{37}{figure.18}
+\contentsline {figure}{\numberline {19}{\ignorespaces Decision tree with non-orthogonal/non-linear partitions for submarket identification, Sapporo land prices}}{38}{figure.19}
+\contentsline {figure}{\numberline {20}{\ignorespaces IBF-based non-orthogonal land price regions (log) in Sapporo}}{39}{figure.20}
+\contentsline {figure}{\numberline {21}{\ignorespaces Decision tree with orthogonal partitions, Ontario voter turnout}}{40}{figure.21}
+\contentsline {figure}{\numberline {22}{\ignorespaces Decision tree with non-orthogonal/non-linear partitions, Ontario voter turnout}}{41}{figure.22}
+\contentsline {figure}{\numberline {23}{\ignorespaces Decision charts for voter turnout}}{42}{figure.23}

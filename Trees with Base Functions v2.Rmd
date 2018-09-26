@@ -1,0 +1,1481 @@
+---
+title: Inducing Non-Orthogonal and Non-Linear Decision Boundaries in Decision Trees via Interactive Basis Functions
+author:
+  - name: Antonio Paez
+    email: paezha@mcmaster.ca
+    affiliation: McMaster University
+    footnote: Corresponding Author
+  - name: Fernando Lopez
+    email: fernando.lopez@upct.es
+    affiliation: Universidad Politecnica de Cartagena
+  - name: Manuel Ruiz
+    email: manuel.ruiz@upct.es
+    affiliation: Universidad Politecnica de Cartagena
+  - name: Maximo Camacho
+    email: m.camacho@um.es
+    affiliation: Universidad de Murcia
+address:
+  - code: McMaster University
+    address: School of Geography and Earth Sciences, 1280 Main Street West, Hamilton ON, Canada L8S 4K1
+  - code: Universidad Politecnica de Cartagena
+    address: Facultad de Ciencias de la Empresa, Dept. de Métodos Cuantitativos e Informáticos, Calle Real, 3, 30201 Cartagena, Murcia, España
+  - code: Universidad de Murcia
+    address: Facultad de Economía y Empresa, Dept. de Métodos Cuantitativos para la Economía y la Empresa, 30100 Murcia, Murcia, España
+abstract: |
+  Decision Trees (DTs) are a machine learning technique widely used for regression and classification purposes. Conventionally, the decision boundaries of Decision Trees are orthogonal to the features under consideration. A well-known limitation of this is that the algorithm may fail to find optimal partitions, or in some cases any partitions at all, depending on the underlying distribution of the data. To remedy this limitation, several modifications have been proposed that allow for oblique decision boundaries. The objective of this paper is to propose a new strategy for generating flexible decision boundaries by means of interactive basis functions (IBFs). We show how oblique decision boundaries can be obtained as a particular case of IBFs, and in addition how non-linear decision boundaries can be induced. One attractive aspect of the strategy proposed in this paper is that training Decision Trees with IBFs does not require custom software, since the functions can be precalculated for use in any existing implementation of the algorithm. Since the underlying mechanisms remain unchanged there is no substantial computational overhead compared to conventional trees. Furthermore, this also means that IBFs can be used in any extensions of the Decision Tree algorithm, such as evolutionary trees, boosting, and bagging. We conduct a benchmarking exercise to show how the use of IBFs can often improve the performance of models. In addition, we present three empirical applications that illustrate the approach in classification and regression. As part of discussing the empirical applications, we introduce a device called _decision charts_ to facilitate the interpretation of DTs with IBFs. Finally, we conclude the paper by outlining some directions for future research.
+
+bibliography: bibliography.bib
+output: rticles::elsevier_article
+header-includes:
+   - \usepackage{float}
+   - \usepackage[nomarkers,figuresonly]{endfloat}
+   - \floatplacement{figure}{H} #make every figure with caption = h
+   - \usepackage{booktabs}
+   - \usepackage{booktabs}
+   - \usepackage{longtable}
+   - \usepackage{array}
+   - \usepackage{multirow}
+   - \usepackage[table]{xcolor}
+   - \usepackage{wrapfig}
+   - \usepackage{float}
+   - \usepackage{colortbl}
+   - \usepackage{pdflscape}
+   - \usepackage{tabu}
+   - \usepackage{threeparttable}
+   - \usepackage{threeparttablex}
+   - \usepackage[normalem]{ulem}
+   - \usepackage{makecell}
+---
+
+```{r Initialize, echo = FALSE, warning = FALSE, message = FALSE}
+#Clean environment
+rm(list = ls())
+
+#knitr options
+knitr::opts_chunk$set(fig.pos= "h")
+
+#Load packages used for analysis
+library(tidyverse)
+library(plyr)
+library(ggthemes)
+library(readxl)
+library(tree)
+library(evtree)
+library(rpart)
+library(rpart.plot)
+library(ggmap)
+library(readr)
+library(rgdal)
+library(knitr)
+library(kableExtra)
+library(mlbench)
+#library(dprep)
+#library(rattle.data)
+library(microbenchmark)
+library(RColorBrewer)
+library(scales)
+library(gridExtra)
+library(stringr)
+```
+
+```{r read-benchmarking-results, echo=FALSE}
+load("Results_Tree_v2.RData")
+load("Results_Forest_v2.RData")
+load("Results_EvolutionaryTree_v2.RData")
+```
+
+```{r read-data-newark, echo = FALSE, warning = FALSE}
+#read the data for Newark and create factor variable
+load("Newark.RData")
+ref_long_newark <- min(Newark$X)
+ref_lat_newark <- max(Newark$Y)
+range_long <- max(Newark$X) - ref_long_newark
+range_lat <- max(Newark$Y) - ref_lat_newark
+max_range_newark <- max(range_long, range_lat)
+Newark <- transmute(Newark, long = (X - ref_long_newark)/max_range_newark, lat = (Y - ref_lat_newark)/max_range_newark, Ethnicity = factor(NW + 2 * IRISH + 3 * GERMAN, labels = c("NW", "IRISH", "GERMAN")))
+```
+
+```{r read-data-sapporo, echo = FALSE, warning=FALSE, message=FALSE, warning=FALSE}
+#read the data for Sapporo and take log of land price
+sapporo <- read_csv("Sapporo Land Prices.csv")
+sapporo <- transmute(sapporo, LandPrice = LandPrice, long = LONG, lat = LAT)
+ref_long_sapporo <- mean(sapporo$long)
+ref_lat_sapporo <- mean(sapporo$lat)
+range_long <- max(sapporo$long) - min(sapporo$long)
+range_lat <- max(sapporo$lat) - min(sapporo$lat)
+max_range_sapporo <- max(range_long, range_lat)
+sapporo <- transmute(sapporo, LandPrice, logPrice = log(LandPrice),
+                     long = (long - ref_long_sapporo)/max_range_sapporo, 
+                     lat = (lat - ref_lat_sapporo)/max_range_sapporo)
+#summary(sapporo)
+```
+
+```{r read-shape-sapporo, include=FALSE}
+#read Sapporo shape files with mask
+sapporomask1.sp <- readOGR("Sapporo Mask 1.shp") #Mask for Sapporo City Boundary
+sapporomask2.sp <- readOGR("Sapporo Mask 2.shp") #Mask for Sapporo City Boundary
+```
+
+```{r base-maps, cache = TRUE, echo = FALSE, message = FALSE}
+# #Retrieve base maps and save them, to facilitate working off-line
+# Newark.bm <- get_map(location = c(lon = mean(Newark$long) * max_range_newark + ref_long_newark + 0.001, 
+#                                   lat = mean(Newark$lat) * max_range_newark + ref_lat_newark), 
+#                      zoom = 15)
+# sapporo.bm <- get_map(location = c(lon = mean(sapporo$long) * max_range_sapporo + ref_long_sapporo + 0.001, 
+#                                   lat = mean(sapporo$lat) * max_range_sapporo + ref_lat_sapporo), 
+#                      zoom = 13)
+# #save base maps
+# save(Newark.bm, sapporo.bm, file = "Base Maps.RData")
+
+#load presaved base maps
+load("Base Maps.RData")
+```
+
+1 Introduction
+==========================
+
+Decision Trees (DTs) are a popular machine learning technique used both for regression and classification purposes [@Loh2011; @James2013]. A DT is trained by means of a training dataset that provides a set of independent variables (or _features_) used to create recursive partitions of the decision space. This is achieved by locally optimizing  at each step a loss function that depends on the type of problem (i.e., regression or classification) and/or the specific implementation of the algorithm [i.e., an entropy function for C4.5 and a gini index for CART; see @Loh2011].
+
+Decision Trees find applications in a variety of domains, including, inter alia, transportation [e.g., @Ghasri2017], physical geography [e.g., @Praskievicz2018], engineering [e.g., @Bektas2013; @Suhail2018], and environmental sciences [e.g., @Choubin2018]. There are several characteristics that make DTs an appealing modeling approach. Notably, DTs are more intuitive than linear/logistic regression [@James2013 p. 315] and have much greater interpretability than, for instance, artificial neural networks and support vector machines [@Yang2017 p. 354].  In addition, in some settings DTs provide a reasonable heuristic for human decision making [@James2013 p. 315]. Finally, although no single technique can be expected to be uniformly superior in every case, the performance of DTs has been shown to be competitive with, and in some cases superior to, alternatives such as linear regression, logistic regression, support vector machines, and artificial neural networks [e.g., @Kurt2008; @Choubin2018; @Yang2017].
+
+One characteristic of DTs as conventionally implemented, is that partitions of the variable space are usually done orthogonally to the features. In this way, the partitions are a set of rectangular $p$-dimensional prisms,or hyperboxes. While this is done to reduce the search space of the algorithm, it has the downside that it may fail to find appropriate partitions, and in some extreme cases, to find any partitions at all. In this case, the performance of the algorithm tends to be mediocre. Accordingly, a number of proposals have aimed at ameliorating this situation by inducing oblique partitions [e.g., @Murthy1994; @Wickramarachchi2016; @Cantu-Paz2003].
+
+The objective of this paper is to introduce a novel strategy for non-orthogonal partition of variable space in the training of DTs. The approach is based on the use of interactive basis functions (IBFs). We  will show that oblique partitions result as a particular case of an IBF. Moreover, depending on the basis function selected, non-linear partitions are also possible. The modeling strategy proposed in this paper is attractive because the basis functions can be precalculated and then used as an input to any decision tree algorithm. Since only the inputs to the algorithm change, this implies that 1) the underlying algorithm is not changed and therefore any existing DT software can be used; and 2) basis functions can be used in many existing implementations of DTs, including evolutionary trees, bagging, and boosting. 
+
+The structure of the paper is as follows. In the [background section][Background] we first review some technical aspects of decision trees and motivate the problem. This is followed by a discussion of [basis functions][Interactive Basis Functions] and how they can be employed to induce oblique linear and non-linear partitions. Next, we discuss some [practical aspects][Practical Considerations] of implementing IBFs before conducting a [benchmarking experiment][Benchmarking] the assess the performance or DTs with IBFs by means of a set of publicly available empirical datasets. The results indicate that inducing oblique and/or non-linear partitions using basis functions can improve the performance of the technique and/or produce more parsimonious models. We then illustrating the [application][Sample Applications] of IBFs by means of three empirical examples. Finally, we [conclude][Conclusions and Directions for Future Research] the paper by summarizing our findings and suggesting some directions for future research.
+
+Given the simplicity and ease of implementation of the modeling strategy, the development presented in this paper should be of interest for users of DTs who wish to improve the performance of their models at a relatively modest computational cost.
+
+2 Background
+============
+
+We begin in this section by formally describing the DT algorithm. This will serve to motivate subsequent sections of the paper.
+
+A decision tree is a regression/classification algorithm which models a response variable $Y$ (which could be quantitative or qualitative) from a vector of $p$ features, $X=(X_{1},\dots,X_{p})$, where $X\in \mathrm{R}^{p}$. The algorithm operates by recursively partitioning the space of the features into a set of $M$ regions $R_{m}$, $m=1,...,M$. 
+
+To state the basic notation, let us start by considering a binary tree model with $M$ terminal nodes, each of which $m\in \left\{ 1,...,M \right\}$ represents a branch of the tree that is characterized by $m^{\ast}$ internal splits. The parameter space that characterizes each branch is $\theta_{m}^{m^{\ast }}=\left(v_{m,1}^{d_{1}},s_{m,1},...,v_{{m,m}^{\ast }}^{d_{m^{\ast }}},s_{{m,m}^{\ast}} \right)$, where $X_{v_{m,i}}$ is the splitting variable at the internal split $i$ of the terminal node $m$, with $v_{mi}\in \left\{ 1,...,P \right\}$, $d_{i}=0$ if $X_{v_{m,i}}<s_{m,i}$ and $d_{i}=1$ if $X_{v_{m,i}}>s_{m,i}$, $s_{m,i}$ is the splitting point, and $i\in \left\{ 1,...,m^{\ast } \right\}$. The parameter space of trees with $M$ terminal nodes, $\Theta_{M}$, is formed by the collection of all the combinations of $\theta_{m}=\bigcup\limits_{j=1}^{m^{\ast }}\theta_{m}^{j}$, $\Theta_{M}=\bigcup\limits_{m=1}^M \theta_{m}$.  In this way, a tree is a collection of branches, each of which ends up in a terminal node, that characterizes the partitions or regions through $\theta_{m}$.
+
+The objective of the recursive partitioning mechanism is to try to find optimal partitions in the search space of the features as follows. The path of the partitions determined by each branch is:
+
+$$
+\theta_{m}^{j}=\theta_{m}^{j-1}\bigcup \left( v_{m,j}^{d_{j}},s_{m,j} \right) ,
+$$
+
+Within this framework, each branch $m$ is a collection of sequential partitions $\theta_{m}^{j}$, $j=1,\dots,m^{\ast }$. For each of these partitions, we define a prediction function $f\left( X,\theta _{m}^{j} \right)$, which typically is a central tendency measure of the values of the dependent variable conditional to that region. The goal is to find a decision tree that optimizes some tradeoff between prediction performance, measured by a loss function, $loss\left\{ Y,f\left( X,\theta_{m}^{j} \right) \right\}$, and a measure of the complexity of the tree, $comp\left( \theta_{m}^{j} \right)$, $\hat{\theta}_{m}^{j}=\arg \left[ loss\left\{ Y,f\left( X,\theta_{m}^{j} \right)\right\}+comp\left( \theta_{m}^{j} \right) \right].$
+
+In practice, the recursion ends when any additional partitions result in subsamples below a minimum number of cases (e.g., less than five cases). Operating in this way, the recursive partitioning method produces partitions that are orthogonal to the $p$ features, and thus results in a total of $M$ $p$-dimensional rectangular prisms, or hyperboxes (see Figure 1 \ref{fig:fig1-example} for a prototypical decision tree with two features $X_1$ and $X_2$).
+
+```{r fig1-example, echo=FALSE, fig.cap="\\label{fig:fig1-example}Prototypical Decision Tree"}
+include_graphics("fig1-example.pdf")
+```
+
+Despite its advantages, it is not difficult to find examples where orthogonal recursive partitioning does not work. Consider the situation depicted in Figure \ref{fig:fig2-chessboard}, a simple classification problem with $p=2$ features. It is straightforward to see that in this case the algorithm fails to find an initial partition, as the loss function on the resulting subsets cannot be reduced by any first split. This situation, on the other hand, is easily avoided if oblique splits are used. In this case an optimal split can be found at the first step, as illustrated by the candidate split shown with a dashed line in the figure.
+
+```{r fig2-chessboard, echo = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig2-chessboard}Chessboard example"}
+#Generate data
+X1 <- rep(seq(0.25, 1.75, 0.5), each = 4)
+X2 <- rep(seq(0.25, 1.75, 0.5), 4)
+Y <- rep(1, 16)
+Y[(X1 < 1 & X2 < 1) | (X1 > 1 & X2 > 1)] <- 2
+Y <- factor(Y, labels = c("O", "D"))
+chess22 <- data.frame(Y, X1, X2)
+ggplot(chess22,aes(X1,X2,shape=Y,color=Y)) + 
+  geom_point(size=4) +
+  geom_abline(slope = -1, intercept = 1.3, linetype = 2) +
+  coord_equal() +
+  theme_minimal()
+```
+
+Motivated by the challenge posed by situations such as the one in Figure \ref{fig:fig2-chessboard}, and more generally to better capture non-orthogonal decision boundaries, previous research has seen the development of numerous methods to induce oblique decision boundaries for trees [see @Cantu-Paz2003; and @Wickramarachchi2016 for an overview]. 
+
+As discussed by Wickramarachchi et al. [-@Wickramarachchi2016], some algorithms used to induce oblique partitions identify candidate partition boundaries based on the statistical properties of the data. For instance, a number of algorithms use the orientation of the classes as given by their first principal component [@Henrichon1969], the Household projection matrix [@Wickramarachchi2016], or Fisher's linear discriminant [@Friedman1977]. New features are added to the problem, and the conventional orthogonal partition mechanism is retained. Other algorithms are based on optimization approaches, which could be deterministic or stochastic. CART-LC [@Breiman1984] is an example of the former, whereas Cantu-Paz and Kamath [-@Cantu-Paz2003] with their use of genetic algorithms is an example of the latter. The increase in complexity of these algorithms, and consequently their computational burden, comes from the additional steps needed to conduct additional statistical or optimization procedures. Finally, heuristic approaches have also been used, for example by Manwani and Sastry [-@Manwani2012] and Robertson, Price, and Reale [-@Robertson2013].
+
+In the following section, we describe a novel strategy to induce oblique (and possibly non-linear) decision boundaries via the application of _interactive basis functions_ (IBFs). This modelling strategy adds judiciously constructed features to the dataset while retaining the conventional orthogonal partition mechanism.
+
+3 Interactive Basis Functions (IBFs)
+============
+
+Let us begin our discussion of basis functions by stating that the search domain of a decision tree is contained by the features under consideration. Put in other words, the features used for training constitute the basis vectors for the problem. For instance, when the number of features is $p=2$, the search space is the plane formed by the orthogonal axes of the features, and each feature is a basis vector. Three features form a 3D basis, and so on. If we consider a feature as a basis vector, a basis function is simply a transformation thereby. In the simplest case, the basis function could be the identity:
+$$
+b(X_1) = X_1
+$$
+which is a particular case of a polynomial function, with $a=1$:
+$$
+b(X_1) = X_1^a
+$$
+
+Other basis functions can be defined as well, such as the exponential:
+$$
+b(X_1) = e^{X_1}
+$$
+
+Basis functions are commonly used in regression analysis, where they have the effect of changing the properties of a regression plane. For instance, a transformation from identity to the square of a variable has the effect of changing the regression line to a parabola. Alas, the use of basis functions in DTs does not have the same effect. To see why this is so, consider the general case with $K$ real functions $b_{i}:\mathbb{R}\rightarrow\mathbb{R}$ with $i=1,\dots,K$ candidate base functions. We will call $\{b_1,b_2,\dots, b_K\}$ a set of basis functions. Next proceed to enlarge the set of $p$ features with $T$ new features obtained by means of basis functions:
+
+$$
+X^{\ast }=\left( X_{1},\dots,X_{p},X_{p+1},\dots ,X_{p+T} \right)
+$$
+
+where $X^{\ast }\in \mathbb{R}^{p+T}$, and $X_{p+i}=b_{s_i}( X_{j_i})$, for $i=1,\dots ,T$, $s_i\in \{1,\dots,K\}$ and $j_i\in\{1,\dots,p\}$
+
+Notably, the standard recursive partitioning mechanism of Decision Trees applied to any $X_p$ in the augmented set $T$ leads to partitions of $\left(p+T\right)$-dimensional prisms. Furthermore, the projections of these prisms in the subspace of $\mathrm{R}^{p}$ defined by $X$ still reproduce a linear orthogothal partition of this space. Consider an example with $p=2$, that is $X=\{X_1,X_2\}$. Moreover, $T=1$ and $K=1$ with $b_1(x)=x^2$, so that $X^\ast=\{X_1,X_2,X_3=X_1^2\}$. Whenever the partitioning mechanism  selects a split $s$ in $X_3$ (say, $s=2$, the solid line in Figure \ref{fig:fig3-simple-basis}), this split is projected in $X$ as $X_1=\sqrt X_3$, which is a constant. As a consequence, any splits on the dimension of the basis function is equivalent to finding an orthogonal decision boundary on the original basis, in the present example at $\sqrt 2$ in $X_1$ (dashed line).
+
+```{r fig3-simple-basis, echo = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig3-simple-basis}Example of a basis function used as a feature to train a Decision Tree"}
+#Generate data
+random_df <- data.frame(X1 = rnorm(20, sqrt(2), 0.25)) %>% mutate(X2 = X1^2, class = cut(X1,c(0, sqrt(2), Inf), labels = c("1", "2")))
+ggplot(data = NULL, aes(x = X1, y = X2)) + 
+  geom_point(data = random_df, aes(color = class, shape = class), size = 3) +
+  geom_hline(yintercept = 2) +
+  geom_vline(xintercept = sqrt(2), linetype = 2) +
+  xlab(expression(X[1])) +
+  ylab(expression(X[2]*" = "*X[1]^2)) +
+  theme_minimal()
+```
+
+Since basis functions still produce orthogonal partitions in the original basis, our proposal instead is to use interactive basis functions in the construction of $X^\ast$ for the tree under consideration. These interactions can be identified by a set of $D$ functions that reproduce functional interactions of the transformations of the features by the basis functions. Thus, these interaction functions are defined as:
+
+$$
+\begin{array}{ccl}h_{i}:\mathbb{R}^{pK}&\longrightarrow&\mathbb{R}\\{\tiny (b_1(X_1),b_1(X_2)\dots, b_K(X_p))}&\leadsto &a\end{array}
+$$ 
+
+Under this setting define $X^{\ast }=\left( X_{1},\dots,X_{p},X_{p+1},\dots ,X_{p+D} \right)$,
+with $X_{p+i}=h_i(b_1(X_1),b_1(X_2)\dots, b_K(X_p))$, for $i=1,\dots ,D$. Therefore by applying the standard recursive partitioning method  to $X^\ast$, its projection on $X$ will provide an oblique partition (also eventually non-linear as desired), which will take into account the interactions among the features.
+
+For example, in the case of $p=2$, that is $X=\{X_1,X_2\}$, $T=1$, $K=1$ with $b_1(x)=x$, $D=1$ with $h_1(b_1(X_1),b_1(X_2))=b_1(X_1)+b_2(X_2)=X_1+X_2$ (i.e., an additivie function) and
+$X^{\ast }=\left( X_{1},X_{2},X_{3} \right)$ we obtain that $X_3=s$ is projected in the plane of the original basis as $X_2=s-X_1$, thus providing an oblique partition on that plane as shown in Figure \ref{fig:fig4-additive-basis}.
+
+```{r fig4-additive-basis, echo = FALSE, warning = FALSE, , fig.show = 'asis', fig.cap= "\\label{fig:fig4-additive-basis}Oblique basis function and projections with different splitting points (s)"}
+ggplot(data.frame(x = c(0, 1)), aes(x)) +
+  stat_function(fun=function(x)0.5 - x, geom="line", aes(colour="s = 0.5")) +
+  stat_function(fun=function(x)1 - x, geom="line", aes(colour="s = 1")) +
+  stat_function(fun=function(x)1.25 - x, geom="line", aes(colour="s = 1.25")) +
+  xlab(expression("X"[1])) +
+  ylab(expression("X"[2])) +
+  scale_x_continuous(limits = c(0,1), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0,1), expand = c(0, 0)) +
+  coord_equal() +
+  scale_colour_manual(expression("Split in X"[3]), 
+                      values = c("blue", "red", "black"), 
+                      breaks=c("s = 0.5", "s = 1", "s = 1.25")) +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1)
+  )
+```
+
+It is interesting to note that the framework provided by IBFs allows us to induce, in addition to oblique partitions, non-linear decision boundaries as well. This is done by projecting the equation $h_i(b_1(X_1),b_1(X_2)\dots, b_K(X_p))=a$ in the subspace $X=\{X_1, X_2,\dots, X_p\}$ generated by the features in the dataset. For example, the IBF $h_1(b_1(X_1),b_1(X_2))=b_1(X_1)b_2(X_2)$ with $b_1(x)=x$ leads to $X_1X_2$. A split $s$ in the dimension of this multiplicative IBF fixes $X_1X_2=s$, and therefore $X_2=s/X_1$, thus creating a hyperbolic partition, as shown in Figure \ref{fig:fig5-hyperbolic-basis}.
+
+```{r fig5-hyperbolic-basis, echo = FALSE, warning = FALSE, , fig.show = 'asis', fig.cap= "\\label{fig:fig5-hyperbolic-basis}Hyperbolic basis function and projections with different splitting points (s)"}
+ggplot(data.frame(x = c(0, 1)), aes(x)) +
+  stat_function(fun=function(x)0.15/x, geom="line", aes(colour="s = 0.15")) +
+  stat_function(fun=function(x)0.25/x, geom="line", aes(colour="s = 0.25")) +
+  stat_function(fun=function(x)0.75/x, geom="line", aes(colour="s = 0.75")) +
+  xlab(expression("X"[1])) +
+  ylab(expression("X"[2])) +
+  scale_x_continuous(limits = c(0,1), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0,1), expand = c(0, 0)) +
+  coord_equal() +
+  scale_colour_manual(expression("Split in X"[3]), 
+                      values = c("blue", "red", "black"), 
+                      breaks=c("s = 0.15", "s = 0.25", "s = 0.75")) +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1)
+  )
+```
+
+As one final example (see Figure \ref{fig:fig6-radial-basis}), the IBF $h_1(b_1(X_1),b_1(X_2))=b_1(X_1)+b_2(X_2)$ with $b_1(x)=x^2$ leads to $X_1^2 + X_2^2$. A split $s$ in the dimension of the IBF fixes $X_1^2 + X_2^2=s$, and therefore $X_2=\sqrt{s-X_1^2}$, thus creating a radial partition.
+
+```{r fig6-radial-basis, echo = FALSE, warning = FALSE, , fig.show = 'asis', fig.cap= "\\label{fig:fig6-radial-basis}Radial IBF and projections with different splitting points (s)"}
+ggplot(data.frame(x = c(0, 1)), aes(x)) +
+  stat_function(fun=function(x)sqrt(1 - x^2), geom="line", aes(colour="s = 1")) +
+  stat_function(fun=function(x)sqrt(1.5 - x^2), geom="line", aes(colour="s = 1.5")) +
+  stat_function(fun=function(x)sqrt(1.75 - x^2), geom="line", aes(colour="s = 1.75")) +
+  xlab(expression("X"[1])) +
+  ylab(expression("X"[2])) +
+  scale_x_continuous(limits = c(0,1), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0,1), expand = c(0, 0)) +
+  coord_equal() +
+  scale_colour_manual(expression("Split in X"[3]), 
+                      values = c("blue", "red", "black"), 
+                      breaks=c("s = 1", "s = 1.5", "s = 1.75")) +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1)
+  )
+```
+
+It is worthwhile noting at this point that the additive function shown in Figure \ref{fig:fig4-additive-basis} is similar to the case of linear combinations used in the CART-LC algorithm [see @Cantu-Paz2003], however without parameterizing the interactive basis function - or, alternatively, implicitly assuming that $a_1=a_2=1$:
+$$
+h_1(b_1(X_1),b_1(X_2))=b_1(X_1)+b_2(X_2)=a_1X_1+a_2X_2
+$$
+
+In this way, the implementation of IBFs as non-parametric functions leads to a semi-parametric version of DTs. With respect to the complexity of the search, the introduction of IBFs increases the complexity at each node of the tree (when using the conventional search algorithm) by $O(n(p+D))$, where $n$ is the number of cases, $p$ is the number of features, and $D$ is the number of IBFs under consideration. Compare to the exaustive search for oblique decision boundaries [$O(2^p \times{n\choose{p}})$, in @Murthy1994], or an algorithm such as HHCART, which has complexity of $O(Cp^2nlog(n))$ [where $C$ is the number of classes in classification problems, @Wickramarachchi2016]. As can be appreciated, the increase in complexity with our approach is fairly modest.
+
+4 Practical Considerations
+===================
+
+An important consideration in the practical implementation of IBFs concerns the centering and/or scaling of the input features. Centering and scaling are typically monotonical transformations of the data. For instance, a feature vector can be centered on its minimum value or its mean, thus shifting the origin. Scaling can be done for example by scaling all values to the unit interval, or by dividing by the standard deviation to normalize the scale.
+
+Scaling and centering the features has no impact in the training of DT with linear partitions, whether orthogonal or oblique. Any monotonic transformation of the data will simply shift the splitting point that creates a partition accordingly. The same does not necessarily happen with non-linear partitions. Recall that the curvature $\kappa$ of a plane curve is related to the radius of the curve as follows for a given arc length $l$:
+$$
+\kappa(l)=\frac{1}{R(l)}
+$$
+
+Intuitively, the curvature of a straight line is constant at zero. When the radius of a curve for $l$ is large the curvature is small, and viceversa. It follows then that the geometric representation of a non-linear partition in the subspace $X$ depends on the origin (i.e., center) and scale in which the independent variables have been measured. This effect is illustrated in Figure \ref{fig:fig7-curvature}, where a set of radial IBFs are plotted. In one case (top panel) the features $X_1$ and $X_2$ are measured in possibly different scales. Since the origin for these variables is at zero, the radius of the curves is large for partitions whithin the space of interest, and therefore the partitions generated are locally quasi-linear. The bottom panel of the figure shows analog radial IBFs, but now on features $X'_1$ and $X'_2$. These features are obtained by centering variables $X_1$ and $X_2$ on their minimum values, and scaling them to the unit length. Now the radii of the IBFs are smaller, thus resulting on greater curvature and locally non-linear partitions.
+
+For this reason, we recommend centering and scaling all features prior to analysis, in order to increase the chances that non-linear partitions are effective, and reduce the possibility that they resemble linear partitions locally.
+
+```{r fig7-curvature, echo = FALSE, warning = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig7-curvature}Behavior of radial IBF with non-centered/non-scaled variables (top panel) and centered/scaled variables (bottom panel)"}
+p1 <- ggplot(data.frame(x = c(0, 1000)), aes(x)) +
+  stat_function(fun=function(x)sqrt(900^2 - x^2), geom="line", color = "blue") +
+  stat_function(fun=function(x)sqrt(1000^2 - x^2), geom="line", color = "red") +
+  stat_function(fun=function(x)sqrt(1050^2 - x^2), geom="line", color = "black") +
+  xlab(expression("X"[1])) +
+  ylab(expression("X"[2])) +
+  scale_x_continuous(limits = c(500,800), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(700,750), expand = c(0, 0)) +
+  #coord_equal() +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1)
+  )
+
+p2 <- ggplot(data.frame(x = c(0, 1)), aes(x)) +
+  stat_function(fun=function(x)sqrt(0.9^2 - x^2), geom="line", color = "blue") +
+  stat_function(fun=function(x)sqrt(1^2 - x^2), geom="line", color = "red") +
+  stat_function(fun=function(x)sqrt(1.05^2 - x^2), geom="line", color = "black") +
+  xlab(expression("X'"[1])) +
+  ylab(expression("X'"[2])) +
+  scale_x_continuous(limits = c(0,1), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0,1), expand = c(0, 0)) +
+  coord_equal() +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1)
+  )
+
+lay <- rbind(c(NA,1,NA),
+             c(2,2,2))
+
+grid.arrange(p1, p2, layout_matrix = lay)
+```
+
+5 Benchmarking
+===================
+
+In this section we conduct a benchmarking exercise using a collection of publicly available datasets that are widely used in the literature to test the performance of machine learning techniques. The source of the data is the paper of Fernandez-Delgado et al. [-@FernandezDelgado2014], who conducted an extensive experiment testing machine learning algorithms. These authors conducted their experiments with $121$ datasets. An extensive list of classifiers were applied to these datasets, and then the classifiers were ranked based on their average accuracy and probability that they succeed by chance (measured by means of Cohen's kappa). The results indicate that the best classifiers belong to the family of Random Forests and Support Vector Machines.
+
+For the present study we use a subset of that collection. After excluding a number of datasets that led to errors with the algorithms we tested, we work with the 93 datasets listed in Table \ref{tab:Datasets}. The table lists some of the characteristics of the datasets, including the number of observations ($n$), the number of features ($f$), the number of classes ($k$) of the independent variable, and the proportion of the majority class in the dataset ($m$).
+
+```{r dataset-description, echo = FALSE}
+#Summarize datasets:
+#n: number of observations, k: number of variables, f: number of classes of factor, m = proportion majority class
+dataset.stats <- data.frame(`Dataset` = numeric(),
+                            `Dataset Name` = character(), 
+                            `Observations` = numeric(), 
+                            `Features` = numeric(), 
+                            `Classes` = numeric(),
+                            `Prop majority class` = numeric())
+for (i in 1:length(dir.names.ev)){
+  #select dataset
+  df <- read.delim(paste(dir.names[i], "/", file.names[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  dataset.stats <- rbind(dataset.stats,
+                         data.frame(`Dataset` = i,
+                                    `Dataset Name` = str_sub(file.names[i], end=-7), 
+                                    `Observations` = nrow(df), 
+                                    `Features` = ncol(df) - 1, 
+                                    `Classes` = nlevels(df$clase),
+                                    `Prop majority class` = max(table(df$clase))/nrow(df))
+                         )
+}
+
+kable(dataset.stats, "latex", booktabs = TRUE, longtable = TRUE, digits = 2,
+      caption = "\\label{tab:Datasets}Datasets for Benchmarking Experiment") %>%
+  kable_styling(latex_options = c("repeat_header"))
+```
+
+Further, our focus is on comparing DT-based algorithms only. Fernandez-Delgado [-@FernandezDelgado2014] already provide a comprehensive ranking of algorithms, and our objective instead is to assess how IBFs perform in DT, relative to conventional orthogonal partitions. Since one advantage of using IBFs is that they can be used in virtually any implementation of DTs, we choose to illustrate their applicability using three different methods: a conventional tree algorithm [implemented in the R package `tree`, see @Ripley2018], random forest [implemented in the R package `randomForest`, see @Liaw2002], and an evolutionary algorithm [implemented in the package `evtree`, see @Grubinger2014]. It is worthwhile to note that the top algorithm in the experiments of Fernandez-Delgado [-@FernandezDelgado2014] was the parallel implementation of the random forest method; however, these authors did not assess the evolutionary algorithm as we do. Other R packages exist that implement non-orthogonal partitions, however they are limited to binary classification [in the `obliqueRF` package of @Menze2012] or to two features [in the spatial oblique decision trees package `SPODT` of @Gaudart2015]. 
+
+As noted above, centering and scaling the variables is important for the use of IBFs. The variables in the datasets provided by Fernandez-Delgado et al. [-@FernandezDelgado2014] have already been normalized to have a mean of zero and a standard deviation of one (p. 3139). We use the variables as they are, rather than changing them. The experiments are conducted using k-fold cross-validation, a technique commonly used to assess the performance of algorithms that involves randomly thinning a dataset to obtain a $(100 - 100/k)$% training sample, in a procedure that is repeated $k$ times. In line with the experiments of Fernandez-Delgado et al. [-@FernandezDelgado2014] in this section we use 4-fold cross-validation.
+
+In terms of the IBFs, we consider the following functions:
+$$
+\begin{array}{c}\
+h_1(b_1(X_1),b_1(X_2))=b_1(X_1)+b_1(X_2)=X_1+X_2\\
+h_1(b_2(X_1),b_2(X_2))=b_2(X_1)+b_2(X_2)=X_1^2+X_2^2\\
+h_2(b_1(X_1),b_1(X_2))=b_1(X_1)b_2(X_2)=X_1X_2\\
+h_2(b_1(X_1)b_3(X_2))=b_1(X_1)b_3(X_2)=X_1e^{X_2}
+\end{array}
+$$
+
+The size of the experiment is as follows: three different methods (tree/random forest/evolutionary tree), ninety three different datasets, two different types of partitions (orthogonal/IBFs), and four replications for each (i.e., 10-fold cross-validation). The summary of the results is shown in Table \ref{tab:summary-benchmarking}, where it can be seen that random forests outperform evolutionary trees, which in turn outperform conventional trees. This is as anticipated. Further, for the same algorithm, the use of IBF increases the average accuracy slightly, and provides similar results in terms of kappa and the mean tree size.
+
+```{r join-results, echo=FALSE}
+#Join dataframes
+class.results <- rbind(class.results.tree, class.results.forest, class.results.ev)
+```
+
+```{r summary, echo=FALSE}
+#Summarize by classifier, note that some evtree results for kappa were removed for NaNs:
+benchmark_summary <- group_by(class.results, method, bf) %>% 
+  dplyr::summarise(mean_test_acc = mean(test_class),
+            mean_kappa_test = mean(kappa_test.value, na.rm = TRUE),
+            mean_tree_size = mean(tree_size))
+
+kable(benchmark_summary, "latex", booktabs = TRUE, digits = 2,
+      col.names = c("Method", "Base Function", "Mean Accuracy (%)", "Mean kappa", "Mean Tree Size"),
+      caption = "\\label{tab:summary-benchmarking}Summary of Benchmarking Experiment") %>%
+  kable_styling(latex_options = "scale_down") %>%
+  footnote(general = "Tree Size is not meaningful in the case of random forest, since the model is an ensemble of trees. ")
+
+```
+
+## 5.1 Accuracy
+
+The aggregated results suggest that IBFs may improve the accuracy of the algorithms without necessarily leading to more complex models. In this subsection, we take a look first at the results of the benchmarking experiment in terms of the accuracy of the different implementations of the algorithms. 
+
+Figure \ref{fig:fig8-performance-algorithm-results} presents the results of the experiments by method in terms of their accuracy. The horizontal axis is for datasets, ranked from the lowest average accuracy of all methods, to the highest. The plot shows the mean accuracy and standard deviation of each algorithm for each dataset. It can be seen there that the lowest accuracy is around $25$% and the highest is $100$% in the test sample. In general terms, as hinted by the summary results, random forests perform better and tree worse, but this is not always the case. Moreover, there are notable differences between the use of orthogonal and IBF within each methods.
+
+```{r data-accuracy-test, include=FALSE}
+#Wrangle data for plotting accuracy
+
+#Group by dataset, method, and basis function, then calculate the mean accuracy and standard deviation by group
+junk <- group_by(class.results, dataset, method, bf) %>% dplyr::summarize(mean_acc_test = mean(test_class), se_acc_test = sd(test_class))
+
+#Calculate the mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(mean_acc_dataset = mean(mean_acc_test))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2) %>% arrange(mean_acc_dataset)
+
+#Add a variable that ranks the datasets by mean accuracy
+junk$rank_order <- rep(c(1:93), each = 6)
+```
+
+```{r fig8-performance-algorithm-results, echo=FALSE, fig.cap="\\label{fig:fig8-performance-algorithm-results}Benchmarking results: Classification accuracy by Algorithm", fig.height=8, fig.show='asis'}
+#Plot point ranges
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test, ymin = mean_acc_test - se_acc_test, ymax = mean_acc_test + se_acc_test, color = method)) +
+  geom_pointrange() +
+  ylab("Accuracy (%)") +
+  theme_minimal()
+```
+
+```{r data-accuracy-tree-test, include=FALSE}
+#Wrangle data for plotting accuracy
+
+#Group by dataset, method, and basis function, then calculate the mean accuracy and standard deviation by group
+junk <- group_by(class.results.tree, dataset, method, bf) %>% dplyr::summarize(mean_acc_test = mean(test_class), se_acc_test = sd(test_class))
+
+junk$mult <- rep(c(-1, 1), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(diff_mean_acc_dataset = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2) %>% arrange(diff_mean_acc_dataset)
+
+#Add a variable that ranks the datasets by mean accuracy
+junk$rank_order <- rep(c(1:93), each = 2)
+
+#Dummy for mean accuracy of orthogonal 
+junk$mult <- rep(c(1, 0), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(mean_acc_tree = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2)
+
+```
+
+Figure \ref{fig:fig9-accuracy-tree} compares the results of implementing the tree algorithms with orthogonal partitions and IBF. Taking as a baseline the accuracy of the models with orthogonal partitions, the datasets are ranked from the largest accuracy loss to the largest accuracy gain attained by the models with IBFs. As seen in the figure, the implementation with IBFs more often than not leads to accuracy gains, in fact in `r prettyNum(sum(junk$diff_mean_acc_dataset >0)/2, big.mark = ",")` out of 93 datasets. The maximum accuracy gain is `r prettyNum(max(junk$diff_mean_acc_dataset), big.mark = ",", digits = 4)`% whereas the maximum loss is `r prettyNum(min(junk$diff_mean_acc_dataset), big.mark = ",", digits = 4)`%.
+
+```{r fig9-accuracy-tree, echo=FALSE, fig.cap="\\label{fig:fig9-accuracy-tree}Accuracy comparison for method tree: orthogonal and IBF implementations", fig.height=8, fig.show='asis'}
+
+#Plot point ranges using orthogonal as a baseline
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test - mean_acc_tree, ymin = mean_acc_test - mean_acc_tree - se_acc_test, ymax = mean_acc_test - mean_acc_tree + se_acc_test, color = bf, shape = bf)) +
+  geom_pointrange() +
+  ylab("Accuracy Loss/Gain (IBF vs Orthogonal)") +
+  xlab("Rank (from max loss to max gain)") +
+  theme_minimal()
+```
+
+```{r data-accuracy-forest-test, include=FALSE}
+#Wrangle data for plotting accuracy
+
+#Group by dataset, method, and basis function, then calculate the mean accuracy and standard deviation by group
+junk <- group_by(class.results.forest, dataset, method, bf) %>% dplyr::summarize(mean_acc_test = mean(test_class), se_acc_test = sd(test_class))
+
+junk$mult <- rep(c(-1, 1), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(diff_mean_acc_dataset = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2) %>% arrange(diff_mean_acc_dataset)
+
+#Add a variable that ranks the datasets by mean accuracy
+junk$rank_order <- rep(c(1:93), each = 2)
+
+#Dummy for mean accuracy of orthogonal 
+junk$mult <- rep(c(1, 0), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(mean_acc_tree = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2)
+
+```
+
+With respect to random forest, Figure \ref{fig:fig10-accuracy-forest} compares the results of implementing the algorithm with orthogonal partitions and IBF. Again, taking as a baseline the accuracy of the models with orthogonal partitions, the datasets are ranked from the largest accuracy loss to the largest accuracy gain attained by the models with IBFs. As seen in the figure, the implementation with IBFs often leads to accuracy gains, in `r prettyNum(sum(junk$diff_mean_acc_dataset >0)/2, big.mark = ",")` out of 93 datasets. The maximum accuracy gain is `r prettyNum(max(junk$diff_mean_acc_dataset), big.mark = ",", digits = 4)`% whereas the maximum loss is `r prettyNum(min(junk$diff_mean_acc_dataset), big.mark = ",", digits = 4)`%.
+
+```{r fig10-accuracy-forest, echo=FALSE, fig.cap="\\label{fig:fig10-accuracy-forest}Accuracy comparison for method random forest: orthogonal and IBF implementations", fig.height=8, fig.show='asis'}
+#Plot point ranges using orthogonal as a baseline
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test - mean_acc_tree, ymin = mean_acc_test - mean_acc_tree - se_acc_test, ymax = mean_acc_test - mean_acc_tree + se_acc_test, color = bf, shape = bf)) +
+  geom_pointrange() +
+  ylab("Accuracy Loss/Gain (IBF vs Orthogonal)") +
+  xlab("Rank (from max loss to max gain)") +
+  theme_minimal()
+```
+
+```{r data-accuracy-ev-test, include=FALSE}
+#Wrangle data for plotting accuracy
+
+#Group by dataset, method, and basis function, then calculate the mean accuracy and standard deviation by group
+junk <- group_by(class.results.ev, dataset, method, bf) %>% dplyr::summarize(mean_acc_test = mean(test_class), se_acc_test = sd(test_class))
+
+junk$mult <- rep(c(-1, 1), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(diff_mean_acc_dataset = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2) %>% arrange(diff_mean_acc_dataset)
+
+#Add a variable that ranks the datasets by mean accuracy
+junk$rank_order <- rep(c(1:93), each = 2)
+
+#Dummy for mean accuracy of orthogonal 
+junk$mult <- rep(c(1, 0), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(mean_acc_tree = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2)
+
+```
+
+Lastly, Figure \ref{fig:fig11-accuracy-ev} shows the loss/gain in accuracy of the evolutionary trees implemented with IBFs with respect to orthogonal partitions. As before, the datasets are ranked from the largest accuracy loss to the largest accuracy gain attained by the models with IBFs. As seen in the figure, the implementation with IBFs also leads to accuracy gains, in this case in `r prettyNum(sum(junk$diff_mean_acc_dataset >0)/2, big.mark = ",")` out of 93 datasets. The maximum accuracy gain is `r prettyNum(max(junk$diff_mean_acc_dataset), big.mark = ",", digits = 4)`% whereas the maximum loss is `r prettyNum(min(junk$diff_mean_acc_dataset), big.mark = ",", digits = 4)`%.
+
+```{r fig11-accuracy-ev, echo=FALSE, fig.cap="\\label{fig:fig11-accuracy-ev}Accuracy comparison for method evolutionary tree: orthogonal and IBF implementations", fig.height=8, fig.show='asis'}
+#Plot point ranges using orthogonal as a baseline
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test - mean_acc_tree, ymin = mean_acc_test - mean_acc_tree - se_acc_test, ymax = mean_acc_test - mean_acc_tree + se_acc_test, color = bf, shape = bf)) +
+  geom_pointrange() +
+  ylab("Accuracy Loss/Gain (IBF vs Orthogonal)") +
+  xlab("Rank (from max loss to max gain)") +
+  theme_minimal()
+```
+
+To further illuminate the performance of the IBFs in DTs in diverse circumstances, we estimate a model using the results of the benchmarking experiments. In this model the independent variable is a proportion, namely the number of times that the algorithm correctly predicts an observation in the test dataset, relative to the number of observations. The appropriate modeling approach for proportions is the logistic model. For this model, we use as explanatory variables the attributes of the datasets, to wit, the number of observations ($n$), the number of features ($f$), the number of classes in the dependent variable ($k$), and the proportion of the majority class ($m$), as well as their squares in order to capture non-linearities. Furthermore, we use an indicator variable ($method$) for the three algorithms (i.e. tree, random forest, evolutionary tree), and whether the basis function ($bf$) was orthogonal or IBF. In addition we interact the variable for the basis function ($bf$) with other variables. The results of the model appear in Table \ref{tab:model-accuracy-results}. As seen there, all coefficients are significant at conventional levels of significance. The significant variable interactions obscure the overall effect: whereas the coefficient for IBF is significant and positive, which indicates that the use of IBFs increases the accuracy of the algorithms, it is best to simulate the probability of a success to more fully realize their effect.
+
+```{r dataframe-for-model, include=FALSE}
+#n: number of observations, k: number of variables, f: number of classes of factor, m = proportion majority class
+dataset.stats <- data.frame(nm = character(), n = numeric(), k = numeric(), f = numeric())
+for (i in 1:length(dir.names.ev)){
+  #select dataset
+  df <- read.delim(paste(dir.names[i], "/", file.names[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  dataset.stats <- rbind(dataset.stats,
+                         data.frame(dataset = i,
+                                    nm = paste(dir.names[i], "/", file.names[i], sep = ""), 
+                                    n = nrow(df), 
+                                    f = ncol(df) - 1, 
+                                    k = nlevels(df$clase),
+                                    m = max(table(df$clase))/nrow(df))
+                         )
+}
+```
+
+```{r join-dataframes-for-modeling, include=FALSE}
+#Join with results:
+class.results <- left_join(rbind(class.results.tree, class.results.forest, class.results.ev), dataset.stats)
+```
+
+```{r calculate-hits, include=FALSE}
+class.results <- mutate(class.results, test_class.success = round(test_class/100 * n), test_class.fail = n - test_class.success)
+```
+
+```{r add-non-linear-terms, include=FALSE}
+class.results <- mutate(class.results, n_2 = n^2, f_2 = f^2, k_2 = k^2, m_2 = m^2)
+```
+
+```{r model-accuracy, include=FALSE}
+#Estimate model:
+model_acc <- glm(formula = cbind(test_class.success, test_class.fail) ~ n + n_2 + f + f_2 + k + k_2 + m + m_2 + method + bf + bf:n + bf:n_2 + bf:f + bf:f_2 + bf:k + bf:k_2 + bf:m + bf:m_2 + bf:method,
+               binomial, data = class.results)
+```
+
+```{r model-accuracy-results, results= "asis", echo=FALSE}
+results_acc <- texreg::extract(model_acc)
+results_acc@coef.names <- c("Intercept", "n", "n^2", "f", "f^2", "k", "k^2", "m", "m^2", 
+                             "Forest", "Evolutionary Tree", 
+                             "IBF", "n:IBF", "n^2:IBF", "f:IBF", "f^2:IBF", "k:IBF", "k^2:IBF", "m:IBF", "m^2:IBF", 
+                             "Forest:IBF", "Evolutionary Tree:IBF")
+names(results_acc@coef) <- c("Intercept", "n", "n^2", "f", "f^2", "k", "k^2", "m", "m^2", 
+                             "Forest", "Evolutionary Tree", 
+                             "IBF", "n:IBF", "n^2:IBF", "f:IBF", "f^2:IBF", "k:IBF", "k^2:IBF", "m:IBF", "m^2:IBF", 
+                             "Forest:IBF", "Evolutionary Tree:IBF")
+summary.df <- data.frame(Estimate = results_acc@coef, `p-value` = results_acc@pvalues)
+kable(summary.df, 
+      "latex", 
+      digits = 6, 
+      booktabs = T,
+      caption = "\\label{tab:model-accuracy-results}Accuracy: Results of logistic model (dependent variable: proportion of correct predictions)") %>%
+  footnote(general = c(paste(results_acc@gof.names[1], " = ", as.character(round(results_acc@gof[1], digits = 3))),
+                       paste(results_acc@gof.names[2], " = ", as.character(round(results_acc@gof[2], digits = 3))),
+                       paste(results_acc@gof.names[3], " = ", as.character(round(results_acc@gof[3], digits = 3))),
+                       paste(results_acc@gof.names[4], " = ", as.character(round(results_acc@gof[4], digits = 3))),
+                       paste(results_acc@gof.names[5], " = ", as.character(round(results_acc@gof[5], digits = 3)))),
+           escape=F) %>%
+  row_spec(11, hline_after = T)
+```  
+
+```{r odds-ratios, include=FALSE}
+#model_acc_results <- exp(cbind(OR = coef(model_acc), confint(model_acc)))
+#model_acc_results
+```
+
+In Figures \ref{fig:fig12-estimated-accuracy-n}, \ref{fig:fig13-estimated-accuracy-f}, \ref{fig:fig14-estimated-accuracy-k}, \ref{fig:fig15-estimated-accuracy-m}, the probabilities of correctly predicting an observation are plotted with respect to the characteristics of the datasets. The probabilities are predicted within the first decile and and ninth decile of the corresponding variable, to avoid making predictions in regions were the number of observations are sparse (for instance, as seen in Table \ref{tab:Datasets}, there is only one dataset with $n>40,000$). As well, the remaining variables are set at their median values. In this way, when predicting the probability as a function of $n$, $f$, $k$, and $m$ are set to their in-sample median values. The plots show the estimated probabilities with their respective $95$% confidence intervals.
+
+With respect to the size of the dataset ($n$), the general trend is that accuracy tends to decline for bigger datasets (see Figure \ref{fig:fig12-estimated-accuracy-n}). The use of IBFs is a clear improvement over DTs with orthogonal partitions, however, this is not the case for evolutionary trees, an algorithm that performs significantly better with orthogonal partitions. In the case of random forests, there is a a small significant difference between orthogonal partitions and IBFs, with orthogonal partitions leading to better accuracy for smaller datasets only ($n<1,500$). 
+
+Figure \ref{fig:fig13-estimated-accuracy-f} shows the results for the number of features $f$. As seen there, accuracy tends to improve as the number of features increases, irrespective of the method or basis function. Similar to the size of the sample, using IBFs uniformly tends to improve accuracy for the algorithm tree. Evolutionary trees are significantly more accurate when using orthogonal partitions. And orthogonal partitions in random forests work slightly better than IBFs, but only when the number of features is relatively small, approximately less than $15$, after which point the difference is no longer significant.
+
+The third dimension that we investigate is the number of classes. As shown in Figure \ref{fig:fig14-estimated-accuracy-k}, there is a general tendency for accuracy to deteriorate as the number of classes $k$ incrases. However, despite starting at higher levels of accuracy with respect to orthogonal partitions, this happens much more rapidly when IBFs are used. In this case, IBFs are associated with better or similar accuracy when $k\leq3$ but have significantly lower levels of accuracy when the dependent variables has more classes.
+
+Lastly, with respect to the proportion of the majority class $m$, we can see that the probability tends to behave in a non-linear fashion, with accuracy being higher when one class has a majority but does not dominate. In this case, IBFs tend to perform significantly better than non-linear partitions. The superiority of IBFs is uniform for the algorithm tree, whereas for evolutionary tree and random forest, orthogonal partitions are significantly more accurate than IBFs.
+
+It is important to keep in mind when interpreting these results, that each plot was estimated _while setting three dimensions to their median values_. For this reason, one must be cautious when trying to generalize. The results, nonetheless, are illustrative of potentially the range of different conditions in which the use of IBFs might be desirable.
+
+```{r create-newdata-n, include=FALSE}
+qn <- quantile(dataset.stats$n, probs = seq(0, 1, 0.10))
+newdata.n <- with(class.results, data.frame(n = rep(seq(from = qn[2], to = qn[10], length.out = 100), each = 6), 
+                                           f = median(f), 
+                                           k = round(median(k)), 
+                                           m = median(m),
+                                           bf = factor(rep(c("Orthogonal", "IBF"), times = 300)),
+                                           method = rep(factor(c( "Tree", "Forest", "Evolutionary Tree")), times = 200)
+                                           )
+                 )
+```
+
+```{r add-non-linear-terms-newdata-n, include=FALSE}
+newdata.n <- mutate(newdata.n, n_2 = n^2, f_2 = f^2, k_2 = k^2, m_2 = m^2)
+```
+
+```{r simulate-probs-n, include=FALSE}
+#The code to generate the predicted probabilities (the first line below) is the same as before, except we are also going to ask for standard errors so we can plot a confidence interval. We get the estimates on the link scale and back transform both the predicted values and confidence limits into probabilities.
+
+newdata.n2 <- cbind(newdata.n, predict(model_acc, newdata = newdata.n, type = "link",
+    se = TRUE))
+newdata.n2 <- within(newdata.n2, {
+    PredictedProb <- plogis(fit)
+    LL <- plogis(fit - (1.96 * se.fit))
+    UL <- plogis(fit + (1.96 * se.fit))
+})
+```
+
+```{r fig12-estimated-accuracy-n, echo=FALSE, fig.cap="\\label{fig:fig12-estimated-accuracy-n}Probability of correctly predicting an observations as a function of number of observations (n)", fig.height=8, fig.show='asis'}
+ggplot(data = newdata.n2, aes(x = n, y = PredictedProb)) + 
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = bf, color = method), alpha = 0.2) + 
+  geom_line(aes(color = method, linetype = bf), size = 1) + 
+  theme_minimal()
+```
+
+```{r create-newdata-f, include=FALSE}
+qn <- quantile(dataset.stats$f, probs = seq(0, 1, 0.10))
+newdata.f <- with(class.results, data.frame(n = median(n), 
+                                           f = rep(seq(from = qn[2], to = qn[10], length.out = 100), each = 6), 
+                                           k = round(median(k)), 
+                                           m = median(m),
+                                           bf = factor(rep(c("Orthogonal", "IBF"), times = 300)),
+                                           method = rep(factor(c( "Tree", "Forest", "Evolutionary Tree")), times = 200)
+                                           )
+                 )
+```
+
+```{r add-non-linear-terms-newdata-f, include=FALSE}
+newdata.f <- mutate(newdata.f, n_2 = n^2, f_2 = f^2, k_2 = k^2, m_2 = m^2)
+```
+
+```{r simulate-probs-f, include=FALSE}
+#The code to generate the predicted probabilities (the first line below) is the same as before, except we are also going to ask for standard errors so we can plot a confidence interval. We get the estimates on the link scale and back transform both the predicted values and confidence limits into probabilities.
+
+newdata.f2 <- cbind(newdata.f, predict(model_acc, newdata = newdata.f, type = "link",
+    se = TRUE))
+newdata.f2 <- within(newdata.f2, {
+    PredictedProb <- plogis(fit)
+    LL <- plogis(fit - (1.96 * se.fit))
+    UL <- plogis(fit + (1.96 * se.fit))
+})
+```
+
+```{r fig13-estimated-accuracy-f, echo=FALSE, fig.cap="\\label{fig:fig13-estimated-accuracy-f}Probability of correctly predicting an observations as a function of number of features (f)", fig.height=8, fig.show='asis'}
+ggplot(data = newdata.f2, aes(x = f, y = PredictedProb)) + 
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = bf, color = method), alpha = 0.2) + 
+  geom_line(aes(color = method, linetype = bf), size = 1) + 
+  theme_minimal()
+```
+
+```{r create-newdata-k, include=FALSE}
+qn <- quantile(dataset.stats$k, probs = seq(0, 1, 0.10))
+newdata.k <- with(class.results, data.frame(n = median(n), 
+                                           f = round(median(f)), 
+                                           k = rep(seq(from = qn[2], to = qn[10], length.out = 100), each = 6), 
+                                           m = median(m),
+                                           bf = factor(rep(c("Orthogonal", "IBF"), times = 300)),
+                                           method = rep(factor(c( "Tree", "Forest", "Evolutionary Tree")), times = 200)
+                                           )
+                 )
+```
+
+```{r add-non-linear-terms-newdata-k, include=FALSE}
+newdata.k <- mutate(newdata.k, n_2 = n^2, f_2 = f^2, k_2 = k^2, m_2 = m^2)
+```
+
+```{r simulate-probs-k, include=FALSE}
+#The code to generate the predicted probabilities (the first line below) is the same as before, except we are also going to ask for standard errors so we can plot a confidence interval. We get the estimates on the link scale and back transform both the predicted values and confidence limits into probabilities.
+
+newdata.k2 <- cbind(newdata.k, predict(model_acc, newdata = newdata.k, type = "link",
+    se = TRUE))
+newdata.k2 <- within(newdata.k2, {
+    PredictedProb <- plogis(fit)
+    LL <- plogis(fit - (1.96 * se.fit))
+    UL <- plogis(fit + (1.96 * se.fit))
+})
+```
+
+```{r fig14-estimated-accuracy-k, echo=FALSE, fig.cap="\\label{fig:fig14-estimated-accuracy-k}Probability of correctly predicting an observations as a function of number of classes (k)", fig.height=8, fig.show='asis'}
+ggplot(data = newdata.k2, aes(x = k, y = PredictedProb)) + 
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = bf, color = method), alpha = 0.2) + 
+  geom_line(aes(color = method, linetype = bf), size = 1) + 
+  theme_minimal()
+```
+
+```{r create-newdata-m, include=FALSE}
+qn <- quantile(dataset.stats$m, probs = seq(0, 1, 0.10))
+newdata.m <- with(class.results, data.frame(n = median(n), 
+                                           f = median(f), 
+                                           k = round(median(k)), 
+                                           m = rep(seq(from = qn[2], to = qn[10], length.out = 100), each = 6),
+                                           bf = factor(rep(c("Orthogonal", "IBF"), times = 300)),
+                                           method = rep(factor(c( "Tree", "Forest", "Evolutionary Tree")), times = 200)
+                                           )
+                 )
+```
+
+```{r add-non-linear-terms-newdata-m, include=FALSE}
+newdata.m <- mutate(newdata.m, n_2 = n^2, f_2 = f^2, k_2 = k^2, m_2 = m^2)
+```
+
+```{r simulate-probs-m, include=FALSE}
+#The code to generate the predicted probabilities (the first line below) is the same as before, except we are also going to ask for standard errors so we can plot a confidence interval. We get the estimates on the link scale and back transform both the predicted values and confidence limits into probabilities.
+
+newdata.m2 <- cbind(newdata.m, predict(model_acc, newdata = newdata.m, type = "link",
+    se = TRUE))
+newdata.m2 <- within(newdata.m2, {
+    PredictedProb <- plogis(fit)
+    LL <- plogis(fit - (1.96 * se.fit))
+    UL <- plogis(fit + (1.96 * se.fit))
+})
+```
+
+```{r fig15-estimated-accuracy-m, echo=FALSE, fig.cap="\\label{fig:fig15-estimated-accuracy-m}Probability of correctly predicting an observations as a function of proportion majority class (m)", fig.height=8, fig.show='asis'}
+ggplot(data = newdata.m2, aes(x = m, y = PredictedProb)) + 
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = bf, color = method), alpha = 0.2) + 
+  geom_line(aes(color = method, linetype = bf), size = 1) + 
+  theme_minimal()
+```
+
+## 5.2 Tree Size
+
+The last part of our benchmarking experiment is related to the size of trees. Since random forests are ensembles of trees, they are excluded from this. As hinted at by Table \ref{tab:summary-benchmarking}, the size of the trees did not change much when using IBFs. To further investigate this, we estimate a linear regression model, specified in a similar fashion to the model in the preceding section, with tree size as the dependent variable. The results of this exercise are shown in Table \ref{tab:model-tree-results}. As seen there, the algorithms in general tend to generate more complex trees (more terminal nodes) when the number of observations is large, and there are non-linear relationships with respect to number of classes $k$, and proportion of majority class $m$. The only other noteworthy result is that evolutionary tree tends to produce less complex trees (on average with 2.5 less terminal nodes) than the tree algorithm. Since no other coefficients are significant, we conclude that there is no increase in model complexity when using IBFs.
+
+```{r model-tree, include=FALSE}
+#Estimate model:
+model_tree <- glm(formula = tree_size ~ n + n_2 + f + f_2 + k + k_2 + m + m_2 + method + bf + bf:n + bf:n_2 + bf:f + bf:f_2 + bf:k + bf:k_2 + bf:m + bf:m_2 + bf:method,
+               gaussian, data = filter(class.results, method != "Forest"))
+```
+
+```{r model-tree-results, results= "asis", echo=FALSE}
+results_tree <- texreg::extract(model_tree)
+results_tree@coef.names <- c("Intercept", "n", "n^2", "f", "f^2", "k", "k^2", "m", "m^2", 
+                             "Evolutionary Tree", 
+                             "IBF", "n:IBF", "n^2:IBF", "f:IBF", "f^2:IBF", "k:IBF", "k^2:IBF", "m:IBF", "m^2:IBF", 
+                             "Evolutionary Tree:IBF")
+names(results_tree@coef) <- c("Intercept", "n", "n^2", "f", "f^2", "k", "k^2", "m", "m^2", 
+                             "Evolutionary Tree", 
+                             "IBF", "n:IBF", "n^2:IBF", "f:IBF", "f^2:IBF", "k:IBF", "k^2:IBF", "m:IBF", "m^2:IBF", 
+                             "Evolutionary Tree:IBF")
+summary.df <- data.frame(Estimate = results_tree@coef, `p-value` = results_tree@pvalues)
+kable(summary.df, 
+      "latex", 
+      digits = 6, 
+      booktabs = T,
+      caption = "\\label{tab:model-tree-results}Tree size: Results of linear regression model (dependent variable: tree size)") %>%
+  footnote(general = c(paste(results_acc@gof.names[1], " = ", as.character(round(results_acc@gof[1], digits = 3))),
+                       paste(results_acc@gof.names[2], " = ", as.character(round(results_acc@gof[2], digits = 3))),
+                       paste(results_acc@gof.names[3], " = ", as.character(round(results_acc@gof[3], digits = 3))),
+                       paste(results_acc@gof.names[4], " = ", as.character(round(results_acc@gof[4], digits = 3))),
+                       paste(results_acc@gof.names[5], " = ", as.character(round(results_acc@gof[5], digits = 3)))),
+           escape=F) %>%
+  row_spec(11, hline_after = T)
+```  
+
+
+6 Sample Applications
+===================
+
+As illustrated in the benchmarking exercise above, the modelling strategy proposed here works well on multifeature datasets. Furthermore, inducing oblique and/or non-linear partitions can improve the performance of DTs. In this section, we complement the results of the benchmarking experiment by presenting three empirical examples. One of these examples is a classification problem, and two examples are regressions on quantitative variables. Two of the examples are of geographical interest and have the advantage that the features are geospatial, which greatly facilitates the visualization of the results. The third example is a multifeature set. In this case, we solve the issue of visualizing non-oblique partitions by means of a device that we call _decision charts_.
+
+## 6.1 Classification Example: Ethnic Neighborhoods
+
+The first example that we present is concerned with a spatial classification problem. This kind of problem is often found in geography, public health, and sociology, among other disciplines, and addresses the objective of defining spatial neighborhoods. Examples of this kind of research in the literature include include Gaudart et al. [-@Gaudart2005], a team of reserchers who developed oblique DTs to identify high risk clusters of malaria. Research by Folch and Spielmann [-@Folch2014] led to an algorithm to identify regions with flexible constraints. Wong and Huang [-@Wong2017] identify geographical spheres of influence based on social media data. One more example is the research by Logan et al. [-@Logan2011] that aimed at identifying ethnic neighborhoods using historical datasets.
+
+The example presented here is similar in spirit to the research of Logan et al. [-@Logan2011], and makes use of a portion of the same historical dataset [see @Logan2011urbanhistorical]. The dataset consists of `r nrow(Newark)` individual records for part of Newark, coded by ethnicity according to the 1880 US Census. Of these, `r prettyNum(sum(Newark$Ethnicity == "NW"), big.mark = ",")` records are classified as White Americans, `r prettyNum(sum(Newark$Ethnicity == "IRISH"), big.mark = ",")` are classified as Irish, and `r prettyNum(sum(Newark$Ethnicity == "GERMAN"), big.mark = ",")` are classified as German. The geographical distribution of these groups in the region of Newark under study is shown in Figure \ref{fig:fig11-map-newark}.
+
+```{r fig11-map-newark, cache = TRUE, echo = FALSE, message = FALSE, fig.cap="\\label{fig:fig11-map-newark}Three ethnic groups in Newark (1880 US Census)"}
+#Plot geocoded observations usig ggmap
+ggmap(Newark.bm) + 
+  geom_point(data = Newark, aes(x = (long * max_range_newark + ref_long_newark), 
+                                y = (lat * max_range_newark + ref_lat_newark), 
+                                shape = Ethnicity, color = Ethnicity),
+             alpha = 0.7)
+```
+
+Since the objective of the example is to find homogeneous neighborhoods, this examples considers only two features, namely the coordinates of the observations in longitude and latitude. The following IBFs are introduced as additional features:
+$$
+\begin{array}{c}\
+h_1(b_1(long),b_1(lat))=b_1(long)+b_1(lat)=long+lat\\
+h_2(b_1(long),b_1(lat))=b_1(long)b_1(lat)=long\times lat\\
+h_1(b_2(long),b_2(lat))=b_2(long)+b_2(lat)=long^2+lat^2\\
+h_1(b_3(long),b_3(lat))=b_3(long)+b_3(lat)=e^{long}+e^{lat}\\
+h_2(b_3(long)b_3(lat))=b_3(long)b_3(lat)=e^{long}\times e^{lat}
+\end{array}
+$$
+
+```{r add-basis-training-newark, echo=FALSE}
+#Add interactive basis functions to dataframe
+Newark <- mutate(Newark, 
+                 long_plus_lat = long + lat, 
+                 longXlat = long * lat,
+                 long2_plus_lat2 = long^2 + lat^2,
+                 exp_long_plus_exp_lat = exp(long) + exp(lat),
+                 exp_longXexp_lat = exp(long) * exp(lat)
+                 )
+```
+
+```{r train-orthogonal-newark, echo=FALSE, message=FALSE}
+#train a tree using only orthogonal decision boundaries
+mod1 <- rpart(Ethnicity ~ long + lat, Newark)
+#printcp(mod1) # Lowest cross-validation error is with full tree
+```
+
+After some experimentation, the coordinates of the observations were centered at the top right corner of the set of points, and scaled to the unit on the longest extent of the dataset. For comparison purposes, we begin by training a DT for this problem using conventional orthogonal partitions. The results of this model are shown in Figure \ref{fig:fig12-tree-orthogonal-newark}, a model with six terminal nodes that identify two predominantly German neighborhoods, three predominantly White American neighborhoods, and one predominantly Irish neighborhood. The model, after examining the interior branches, did not require pruning.
+
+This model has an in-sample error rate of `r round(0.56087 * 0.69635, digits = 2)` and a cross-validation error rate of `r round(0.56087 * 0.69776, digits = 2)`. The population of two of the White American Neighborhoods is over 60% of that ethnic group. Another neighborhood has a plurality (49%) of White Americans and a more or less even distribution of Irish (22%) and Germans (29%). One neighborhood is strongly Irish (62% of population) with White American and German minorities (27% and 11% respectively). Another neighborhood is strongly German, with over 70% of the residents of that ethnicity, whereas one more has a plurality of Germans (41%) but is otherwise quite mixed. The partitions of the DT in effect delimit the ethnic neighborhoods, as seen Figure \ref{fig:fig13-map-orthogonal-newark}. 
+
+```{r fig12-tree-orthogonal-newark, fig.cap="\\label{fig:fig12-tree-orthogonal-newark}Decisiton tree with orthogonal partitions for spatial classification, Newark ethnic groups", echo=FALSE}
+rpart.plot(mod1)
+#text(mod1, pretty = FALSE)
+```
+
+```{r fig13-map-orthogonal-newark, fig.cap="\\label{fig:fig13-map-orthogonal-newark}Ethnic neighborhoods in Newark, 1880, using orthogonal partitions", echo=FALSE}
+#predict using mod1
+#create a grid for prediction
+prediction.grid <- expand.grid(long = seq(from = min(Newark$long), 
+                                          to = max(Newark$long), 
+                                          by = 0.005),
+                               lat = seq(from = min(Newark$lat), 
+                                         to = max(Newark$lat), 
+                                         by = 0.005))
+prediction.grid <- mutate(prediction.grid, 
+                          Ethnicity = predict(mod1, newdata = prediction.grid[,1:2], type = "class"))
+ggmap(Newark.bm) + geom_point(data = prediction.grid, 
+                              aes(x = long * max_range_newark + ref_long_newark,
+                                  y = lat * max_range_newark + ref_lat_newark,
+                                  color = Ethnicity),
+                              shape = 15,
+                              alpha = 0.2) +
+  scale_color_manual(values = c("red", "black", "green"))
+```
+
+```{r train-basis-newark, echo=FALSE}
+#train a tree using only orthogonal decision boundaries
+mod2 <- rpart(Ethnicity ~ ., Newark)
+#printcp(mod2) # Lowest cross-validation error is with full tree
+```
+
+Next, the same dataset is used to train a tree with IBFs as listed above. The model was examined to determine that pruning was not required. The results of this model are shown in Figure \ref{fig:fig14-tree-basis-newark}. The model also has six terminal nodes which identify two German neighborhoods, three White American neigborhoods, and one Irish neighborhoods. Note that two of the partitions are orthogonal (i.e., $lat < -0.37$ and $lat \ge -0.16$), two partitions are linear but oblique (i.e., $long+lat \ge 0.51$ and $long+lat \ge 0.21$), and one partition is non-linear (i.e., $e^{long}+e^{lat} \ge 2.0$). The ethnic neighborhoods are shown in Figure \ref{fig:fig15-map-basis-newark}. This model has an in-sample error rate of `r round(0.56087 * 0.70414, digits = 2)` and a cross-validation error rate of `r round(0.56087 * 0.70373, digits = 2)`, which is comparable to the orthogonal model. In this case, the analyst must decide whether the neighborhoods identified by the DT with IBFs are a more realistic representation of a spatial process.
+
+```{r fig14-tree-basis-newark, echo=FALSE, fig.cap="\\label{fig:fig14-tree-basis-newark}Decision tree with non-orthogonal/non-linear partitions for spatial classification, Newark ethnic groups", message=FALSE}
+mod2$frame$var <- revalue(mod2$frame$var, c("<leaf>" = "<leaf>", "long"="long", "lat"="lat",
+                                            "long_plus_lat"="long + lat", "longXlat"="long x lat",
+                                            "long2_plus_lat2"="long^2 + lat^2", 
+                                            "exp_long_plus_exp_lat"="e^long + e^lat", 
+                                            "exp_longXexp_lat"="e^long x e^lat"))
+rpart.plot(mod2, cex = 0.75)
+#text(mod2, pretty = FALSE)
+```
+
+
+```{r fig15-map-basis-newark, fig.cap="\\label{fig:fig15-map-basis-newark}Ethnic neighborhoods in Newark, 1880, using non-orthogonal partitions", echo=FALSE}
+#predict using mod2
+#create a grid for prediction
+prediction.grid <- expand.grid(long = seq(from = min(Newark$long), to = max(Newark$long), by = 0.005),
+                               lat = seq(from = min(Newark$lat), to = max(Newark$lat), by = 0.005))
+prediction.grid <- mutate(prediction.grid,
+                          long_plus_lat = long + lat, 
+                          longXlat = long * lat,
+                          long2_plus_lat2 = long^2 + lat^2,
+                          exp_long_plus_exp_lat = exp(long) + exp(lat),
+                          exp_longXexp_lat = exp(long) * exp(lat))
+prediction.grid <- mutate(prediction.grid,
+                          Ethnicity = predict(mod2, newdata = prediction.grid, type = "class"))
+ggmap(Newark.bm) + geom_point(data = prediction.grid, 
+                              aes(x = long * max_range_newark + ref_long_newark,
+                                  y = lat * max_range_newark + ref_lat_newark,
+                                  color = Ethnicity),
+                              shape = 15,
+                              alpha = 0.1) +
+  scale_color_manual(values = c("red", "black", "green"))
+```
+
+## 6.2 Regression Example: Spatial Market Segmentation
+
+The case presented next is similar to the spatial classification problem above, except that it is now a regression situation. The example relates to an issue widely discussed in the real estate and property valuation literature, and is concerned with the identification of spatial submarkets. Numerous papers exist on this topic, including Gabriel [-@Gabriel1984], Feitelson [-@Feitelson1993], Paez et al. [-@Paez2001], Bourassa et al. [-@Bourassa2003], Helbich et al. [-@Helbich2013], and Wheeler et al. [-@Wheeler2014]. More recently, DTs have been applied to identify spatial market segments in a real estate setting by Fuss and Koller [-@Fuss2016], however using orthogonal partitions.
+
+One obvious limitation of using orthogonal partitions in the case of real estate spatial submarkets is that the processes that drive land rent (and therefore property values) tend to be radial and are possibly anisotropic due to inhomogeneities in the landscape. The canonical urban economic theory for monocentric cities (which has since been expanded to polycentric cities) states that land rent decays from business districts [@Alonso1964], a prediction that is borne by numerous empirical studies.
+
+The illustration presented here deals with land prices in Sapporo, Japan. The dataset consists of `r nrow(sapporo)` observations of geocoded land prices (in $\yen/m^2$). Informed by the literature on property valuation, the coordinates (in longitude and latitude) were centered on the geometric mean of the locations of the observations, a location that coincides with the central business district of the city. Further, the coordinates were scaled to the unit on the longest extent of the dataset. Land prices were log-transformed to mitigate their lack of normality. Figure \ref{fig:fig16-map-sapporo} shows the locations of the observations and prices. As can be seen there, Sapporo is a typical monocentric city, with the highest prices concentrated in and around the central business district.
+
+```{r convert-spatial-sapporo, echo=FALSE}
+#convert data frame to spatial points data frame
+sapporo.sp <- sapporo
+coordinates(sapporo.sp) <-~long + lat
+```
+
+```{r check-projections-sapporo, echo = FALSE, warning = FALSE}
+#check spatial data frames to ensure that they are properly projected. File .prj with the shape file contains the projection info
+proj4string(sapporomask1.sp)<-CRS("+proj=longlat +datum=WGS84")
+proj4string(sapporomask2.sp)<-CRS("+proj=longlat +datum=WGS84")
+proj4string(sapporo.sp)<-CRS("+proj=longlat +datum=WGS84")
+```
+
+```{r convert-spatial-to-df, echo=FALSE}
+#`ggplot2` does not work with a `SpatialPointDataFrame`. Convert back to dataframe.
+sapporo <- data.frame(sapporo.sp)
+sapporo$optional <- NULL
+
+```
+
+```{r fig16-map-sapporo, echo=FALSE, fig.cap="\\label{fig:fig16-map-sapporo}Land prices in Sapporo (log)"}
+#Plot geocoded observations usig ggmap
+ggmap(sapporo.bm) + 
+  geom_point(data = sapporo, aes(x = (long * max_range_sapporo + ref_long_sapporo), 
+                                y = (lat * max_range_sapporo + ref_lat_sapporo), 
+                                size = logPrice, color = logPrice),
+             alpha = 0.7) +
+  geom_point(data = sapporo, aes(x = (long * max_range_sapporo + ref_long_sapporo), 
+                                y = (lat * max_range_sapporo + ref_lat_sapporo),
+                                size = logPrice),
+             shape = 1,
+             color = "black",
+             alpha = 0.3) +
+  scale_color_distiller(palette = "Blues", direction = 1)
+  
+```
+
+```{r train-orthogonal-sapporo, echo=FALSE}
+sapporo_mod1 <- rpart(logPrice ~ long + lat, sapporo)
+#printcp(sapporo_mod1) #lowest cross-validation error is full tree
+```
+
+As before, we train a DT using orthogonal partitions. The results of this model are shown in Figure \ref{fig:fig17-tree-orthogonal-sapporo}, where it can be seen that the tree has thirteen terminal nodes, or equivalently spatial submarkets. This was the best-performing tree size, and there was no need to prune. The $pseudo-R^2$ of this model is $0.71$. The submarkets are shown in Figure \ref{fig:fig18-map-orthogonal-sapporo}, where it can be seen that the submarkets manage to capture the monocentric structure of land prices in Sapporo, albeit in cubist style.
+
+```{r fig17-tree-orthogonal-sapporo, echo=FALSE, fig.cap="\\label{fig:fig17-tree-orthogonal-sapporo}Decision tree with orthogonal partitions for submarket identification, Sapporo land prices", fig.height=8, fig.show='asis'}
+rpart.plot(sapporo_mod1, digits = 4)
+#text(sapporo_mod1, pretty = FALSE)
+```
+
+```{r fig18-map-orthogonal-sapporo, message = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig18-map-orthogonal-sapporo}Spatial land price submarkets in Sapporo using orthogonal partitions", echo=FALSE}
+#predict using sapporo_mod1
+#create a grid for prediction
+prediction.grid <- expand.grid(long = seq(from = min(sapporo$long) - 0.35, 
+                                          to = max(sapporo$long) + 0.55, 
+                                          by = 0.005),
+                               lat = seq(from = min(sapporo$lat) - 0.2, 
+                                         to = max(sapporo$lat) + 0.06, 
+                                         by = 0.005))
+#add predictions and convert to factor
+prediction.grid <- mutate(prediction.grid, 
+                          logPrice = predict(sapporo_mod1, newdata = prediction.grid),
+                          logPrice = cut(logPrice, 
+                                        breaks = c(-Inf, sort(unique(logPrice))+0.01),
+                                        labels = FALSE))
+#plot
+ggplot(data = NULL, aes(x = long, y = lat)) + 
+  geom_raster(data = mutate(prediction.grid, 
+                            long = long * max_range_sapporo + ref_long_sapporo,
+                            lat = lat * max_range_sapporo + ref_lat_sapporo),
+              aes(fill = logPrice)) +
+  scale_fill_distiller(palette = "Blues", direction = 1) +
+  geom_polygon(data = sapporomask1.sp, aes(x = long, y = lat, group = group), fill = 'white', color = NA) +
+  geom_polygon(data = sapporomask2.sp, aes(x = long, y = lat, group = group), fill = 'white', color = NA) +
+  coord_fixed(ratio = 1) +
+  labs(x="Easting",y="Northing") +
+  #theme_classic() +
+  theme(panel.background = element_rect(fill = "white", colour = "white"))
+```
+
+```{r add-basis-training-sapporo, echo=FALSE}
+#Add interactive basis functions to dataframe
+sapporo <- mutate(sapporo, 
+                 long_plus_lat = long + lat, 
+                 longXlat = long * lat,
+                 long2_plus_lat2 = long^2 + lat^2,
+                 exp_long_plus_exp_lat = exp(long) + exp(lat),
+                 exp_longXexp_lat = exp(long) * exp(lat)
+                 )
+```
+
+```{r train-basis-sapporo, echo=FALSE}
+sapporo_mod2 <- rpart(logPrice ~ long + lat + long_plus_lat + longXlat + long2_plus_lat2 + exp_long_plus_exp_lat + exp_longXexp_lat, sapporo)
+#printcp(sapporo_mod2) # Lowest cross-validation error is with full tree
+```
+
+The next step was to train a DT, but this time using IBFs as additional features in the dataset. The basis functions used are the same five IBFs used in the preceding example. The resulting DT was checked to see if pruning was appropriate, but the full tree gave the best results (see Figure \ref{fig:fig19-tree-basis-sapporo}). It is worthwhile noting that only one of seven partitions is orthogonal. The remaining six partitions are all non-linear. The number of terminal nodes/submarkets is eight compared to thirteen in the model with orthogonal partitions. Both models have a comparable performace, with a $pseudo-R^2=0.71$, however the use of IBFs results in a more parsimonious model. Furthermore, the resulting market segments (see Figure \ref{fig:fig20-map-basis-sapporo}) are much more appealing, and conform better to our theoretical understanding of the radial and anisotropic mechanisms of land price determination. 
+
+```{r fig19-tree-basis-sapporo, fig.cap="\\label{fig:fig19-tree-basis-sapporo}Decision tree with non-orthogonal/non-linear partitions for submarket identification, Sapporo land prices", fig.height=8, fig.show='asis', echo=FALSE, message=FALSE}
+sapporo_mod2$frame$var <- revalue(sapporo_mod2$frame$var, c("<leaf>" = "<leaf>", "long"="long", "lat"="lat",
+                                            "long_plus_lat"="long + lat", "longXlat"="long x lat",
+                                            "long2_plus_lat2"="long^2 + lat^2", 
+                                            "exp_long_plus_exp_lat"="e^long + e^lat", 
+                                            "exp_longXexp_lat"="e^long x e^lat"))
+rpart.plot(sapporo_mod2, digits = 4)
+#text(sapporo_mod2, pretty = FALSE)
+```
+
+```{r fig20-map-basis-sapporo, message = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig20-map-basis-sapporo}IBF-based non-orthogonal land price regions (log) in Sapporo", echo=FALSE}
+#predict using sapporo_mod1
+#create a grid for prediction
+prediction.grid <- expand.grid(long = seq(from = min(sapporo$long) - 0.35, 
+                                          to = max(sapporo$long) + 0.55, 
+                                          by = 0.0025),
+                               lat = seq(from = min(sapporo$lat) - 0.2, 
+                                         to = max(sapporo$lat) + 0.06, 
+                                         by = 0.0025))
+#add basis functions
+prediction.grid <- mutate(prediction.grid,
+                          long_plus_lat = long + lat, 
+                          longXlat = long * lat,
+                          long2_plus_lat2 = long^2 + lat^2,
+                          exp_long_plus_exp_lat = exp(long) + exp(lat),
+                          exp_longXexp_lat = exp(long) * exp(lat))
+#add predictions and convert to factor
+prediction.grid <- mutate(prediction.grid, 
+                          logPrice = predict(sapporo_mod2, newdata = prediction.grid))
+#plot
+ggplot(data = NULL, aes(x = long, y = lat)) +
+  geom_raster(data = mutate(prediction.grid, 
+                            long = long * max_range_sapporo + ref_long_sapporo,
+                            lat = lat * max_range_sapporo + ref_lat_sapporo),
+              aes(fill = logPrice)) +
+  scale_fill_distiller(palette = "Blues", direction = 1) +
+  geom_polygon(data = sapporomask1.sp, aes(x = long, y = lat, group = group), fill = 'white', color = NA) +
+  geom_polygon(data = sapporomask2.sp, aes(x = long, y = lat, group = group), fill = 'white', color = NA) +
+  coord_fixed(ratio = 1) +
+  labs(x="Easting",y="Northing") +
+  #theme_classic() +
+  theme(panel.background = element_rect(fill = "white", colour = "white")) 
+```
+
+## 6.3 Regression Example: Voter Turnout
+
+The previous two examples were of DTs trained using only two features (the coordinates of the observations) and augmented by means of IBFs. Both examples dealt with forms of spatial segmentation which incidentally facilitate the visualization of the non-orthogonal and non-linear partitions that result from the use of IBFs. In the last example the we present, we use a multifeature dataset of voter turnout in a recent provincial election in Ontario, Canada.
+
+Voter turnout is an issue of interest to behavioral and political scientists, who identify this aspect of democracies as one of three key indicators of their performance [@Powell1982]. Moreover, voter turnout tends to vary quite substantially by region, a fact that has motivated a voluminous literature [starting with the pioneering research of @Powell1982; @Powell1986; and @Jackman1987] that aims at understanding the factors that correlate with voter turnout. Numerous studies exist that empirically test the relationships between voter turnout and a variety of socio-economic, demographic, and other variables [for a relevant review see @Geys2006; and more recently @Stockemer2017]. 
+
+The case presented in this section is of the 2018 provincial election in Ontario, Canada. Data were obtained from three sources. First, a geography file of Electoral Districts in Ontario was obtained from Elections Ontario (https://www.elections.on.ca/en/voting-in-ontario/electoral-district-shapefiles/limited-use-data-product-licence-agreement/download-shapefiles.html). The effectively final counts of the election were obtained from a political blog and cross-checked with information from Elections Ontario for accuracy (https://quandyfactory.com/blog/201/unofficial_ontario_2018_election_riding_by_riding_summary_table). Finally, socio-economic and demographic information was retrieved from the 2016 Canadian Census. Census data were obtained at the level of Census Subdivisions. Electoral Districts are sometimes larger than Census Subdivisions, so census variables were converted to the Electoral Districts by aggregation in the case of absolute values (e.g., population, population by educational achievement), or by calculating their area-weighted averages in the case of rates (e.g., median income).
+
+```{r load-ridings, echo=FALSE}
+ridings <- readOGR(".", "Ridings", verbose = FALSE)
+```
+
+```{r load-election-data, echo = FALSE, message = FALSE, warning=FALSE}
+results <- read_excel("Unofficial Results.xlsx")
+results <- dplyr::rename(results, ED_NAME_EN = Riding)
+results$ED_NAME_EN <- ridings$ED_NAME_EN
+```
+
+```{r read-census-data, echo = FALSE, message = FALSE, warning=FALSE}
+data <- read_excel("Ridings-Census Subdivisions-Overlay-Data.xlsx")
+data$ED_NAME_EN <- ridings$ED_NAME_EN
+```
+
+```{r join-election-to-geography, echo = FALSE, message = FALSE, warning=FALSE}
+data <- left_join(data, results, by = "ED_NAME_EN")
+```
+
+```{r select-census-variables, echo = FALSE, message = FALSE, warning=FALSE}
+data <- transmute(data, ED_NAME_EN, 
+                  Voter_Turnout,
+                  Population, Pop_Den = `Avg Pop Density`,
+                  Median_Age = `Avg Median Age`,
+                  Median_Income = `Avg Median income`, Male_Median_Income = `Avg Male_Median income`, Female_Median_Income = `Avg Female_Median income`,
+                  Pct_Government_Transfer_Payments = `Avg Government transfer payments %`,
+                  Median_Commute_Dur = `Avg Median commuting duration`,
+                  Avg_Inc_Taxes_as_Pct_Inc = `Avg Income taxes as % of total income`,
+                  Pct_Population_in_Low_Income = `Avg Population in low income %`,
+                  `Population 25-64`,
+                  `25-64_No certificate/diploma/degree`,
+                  `25-64_HS diploma/equivalent`,
+                  `25-64_Post HS diploma`,
+                  `25-64_Apprentice/trades certificate`,
+                  `25-64_College certificate/diploma`,
+                  `25-64_University <bachelor's`,
+                  `25-64_University bachelor's+`,
+                  `25-64_University_Bachelor's degree`,
+                  `25-64_University_Above bachelor's`
+                  )
+```
+
+```{r transform-census-variables, echo = FALSE, message = FALSE, warning=FALSE}
+data <- mutate(data,
+                     Prop_no_certificate = `25-64_No certificate/diploma/degree`/`Population 25-64`,
+                     Prop_HS_diploma = `25-64_HS diploma/equivalent`/`Population 25-64`,
+                     Prop_Post_HS_diploma = `25-64_Post HS diploma`/`Population 25-64`,
+                     Prop_trade_certificate = `25-64_Apprentice/trades certificate`/`Population 25-64`,
+                     Prop_college_diploma = `25-64_College certificate/diploma`/`Population 25-64`,
+                     Prop_university_bachelor = `25-64_University_Bachelor's degree`/`Population 25-64`,
+                     Prop_postgraduate = `25-64_University_Above bachelor's`/`Population 25-64`)
+```
+
+```{r select-election-variables, echo=FALSE}
+data <- select(data, -ED_NAME_EN, -Population, -starts_with("25"), -`Population 25-64`)
+```
+
+```{r copy-dataframe-for-scaling, echo=FALSE}
+data.model <- data
+```
+
+The dataset consists of `r nrow(data)` records (one for each electoral district), and seventeen variables, with descriptive statistics as shown in Table \ref{tab:descriptive-statistics-election}. Voter turnout is calculated as the proportion of total votes to number of registered electors. The selection of variables reflects an interest in geographical context (e.g., population density and median commute duration), the effect of government policy (% of government transfers relative to income and average income taxes as percent of income), in addition to features relating to age, income, poverty, and academic achievement. These variables were centered on their minimum values and scaled to the unit interval prior to the analysis.
+
+```{r descriptive-statistics-election, echo=FALSE}
+data.summary <- data.frame(Variable = colnames(data), 
+                           Abbv = c("Turnout", "PD", "MA", "MI", "MMI", "FMI", "PGTP", "MCD", "AITPI", "PPLI", "PNC", "PHSD", "PPHSD", "PTC", "PCD", "PUB", "PPG"), 
+                           Min = prettyNum(apply(data, 2, min), digits = 2),
+                           Max = prettyNum(apply(data, 2, max), digits = 2),
+                           Mean = prettyNum(apply(data, 2, mean), digits = 2),
+                           std = prettyNum(apply(data, 2, sd), digits = 2))
+rownames(data.summary) <- NULL
+
+kable(data.summary, "latex", booktabs = TRUE,
+      caption = "\\label{tab:descriptive-statistics-election}Descriptive statistics for electoral districts in Ontario, 2018") %>%
+  kable_styling(latex_options = c("scale_down"))
+```
+
+
+```{r scale-election-variables, echo=FALSE}
+#Scale variables
+maxs <- apply(data.model[,2:ncol(data.model)], 2, max) 
+mins <- apply(data.model[,2:ncol(data.model)], 2, min)
+data.model <- data.frame(Voter_Turnout = data.model$Voter_Turnout,
+                     as.data.frame(scale(data.model[,2:ncol(data.model)], center = mins, scale = maxs - mins)))
+```
+
+We started by training an initial DT which resulted in a model with eleven terminal nodes. This model was examined, and based on performance was eventually pruned to give the model shown in Figure \ref{fig:fig21-tree-orthogonal-election}. This model has a $pseudo-R^2$ of $0.24$. As seen in the figure, the model is relatively simple, and identifies two covariates that correlate with voter turnout, namely % of population living in low income and population density. The lowest voter turnout rates are associated with Electoral Districts with higher rates of population living in poverty, whereas the highest turnout rates are associated with Electoral Districts characterized by higher population density and low poverty rates.
+
+```{r train-orthogonal-election, echo=FALSE, include=FALSE}
+election_mod1 <- rpart(Voter_Turnout ~ ., data.model)
+#election_mod1_summary <- summary(election_mod1)
+printcp(election_mod1)
+```
+
+```{r prune-election-orthogonal, echo=FALSE}
+#Prune tree
+election_mod1_pruned <- prune(election_mod1, cp = 0.080300)
+```
+
+```{r fig21-tree-orthogonal-election, echo=FALSE, fig.cap="\\label{fig:fig21-tree-orthogonal-election}Decision tree with orthogonal partitions, Ontario voter turnout", fig.height=8, fig.show='asis'}
+rpart.plot(election_mod1_pruned, cex = 0.75, digits = 4)
+```
+
+```{r add-basis-training-election, echo=FALSE}
+#Add interactive basis functions to dataframe
+data.model <- mutate(data.model, 
+                 PD_plus_MA = Pop_Den + Median_Age, PD_plus_MI = Pop_Den + Median_Income, PD_plus_MMI = Pop_Den + Male_Median_Income, PD_plus_FMI = Pop_Den + Female_Median_Income, PD_plus_PGTP = Pop_Den + Pct_Government_Transfer_Payments, PD_plus_MCD = Pop_Den + Median_Commute_Dur, PD_plus_AITPI = Pop_Den + Avg_Inc_Taxes_as_Pct_Inc, PD_plus_PPLI = Pop_Den + Pct_Population_in_Low_Income, PD_plus_PNC = Pop_Den + Prop_no_certificate, PD_plus_PHSD = Pop_Den + Prop_HS_diploma, PD_plus_PTC = Pop_Den + Prop_trade_certificate, PD_plus_PCD = Pop_Den + Prop_college_diploma, PD_plus_PUB = Pop_Den + Prop_university_bachelor, PD_plus_PPG = Pop_Den + Prop_postgraduate,
+                 MA_plus_MI = Median_Age + Median_Income, MA_plus_MMI = Median_Age + Male_Median_Income, MA_plus_FMI = Median_Age + Female_Median_Income, MA_plus_PGTP = Median_Age + Pct_Government_Transfer_Payments, MA_plus_MCD = Median_Age + Median_Commute_Dur, MA_plus_AITPI = Median_Age + Avg_Inc_Taxes_as_Pct_Inc, MA_plus_PPLI = Median_Age + Pct_Population_in_Low_Income, MA_plus_PNC = Median_Age + Prop_no_certificate, MA_plus_PHSD = Median_Age + Prop_HS_diploma, MA_plus_PTC = Median_Age + Prop_trade_certificate, MA_plus_PCD = Median_Age + Prop_college_diploma, MA_plus_PUB = Median_Age + Prop_university_bachelor, MA_plus_PPG = Median_Age + Prop_postgraduate,
+                 MI_plus_MMI = Median_Income + Male_Median_Income, MI_plus_FMI = Median_Income + Female_Median_Income, MI_plus_PGTP = Median_Income + Pct_Government_Transfer_Payments, MI_plus_MCD = Median_Income + Median_Commute_Dur, MI_plus_AITPI = Median_Income + Avg_Inc_Taxes_as_Pct_Inc, MI_plus_PPLI = Median_Income + Pct_Population_in_Low_Income, MI_plus_PNC = Median_Income + Prop_no_certificate, MI_plus_PHSD = Median_Income + Prop_HS_diploma, MI_plus_PTC = Median_Income + Prop_trade_certificate, MI_plus_PCD = Median_Income + Prop_college_diploma, MI_plus_PUB = Median_Income + Prop_university_bachelor, MI_plus_PPG = Median_Income + Prop_postgraduate,
+                 MMI_plus_FMI = Male_Median_Income + Female_Median_Income, MMI_plus_PGTP = Male_Median_Income + Pct_Government_Transfer_Payments, MMI_plus_MCD = Male_Median_Income + Median_Commute_Dur, MMI_plus_AITPI = Male_Median_Income + Avg_Inc_Taxes_as_Pct_Inc, MMI_plus_PPLI = Male_Median_Income + Pct_Population_in_Low_Income, MMI_plus_PNC = Male_Median_Income + Prop_no_certificate, MMI_plus_PHSD = Male_Median_Income + Prop_HS_diploma, MMI_plus_PTC = Male_Median_Income + Prop_trade_certificate, MMI_plus_PCD = Male_Median_Income + Prop_college_diploma, MMI_plus_PUB = Male_Median_Income + Prop_university_bachelor, MMI_plus_PPG = Male_Median_Income + Prop_postgraduate,
+                 FMI_plus_PGTP = Female_Median_Income + Pct_Government_Transfer_Payments, FMI_plus_MCD = Female_Median_Income + Median_Commute_Dur, FMI_plus_AITPI = Female_Median_Income + Avg_Inc_Taxes_as_Pct_Inc, FMI_plus_PPLI = Female_Median_Income + Pct_Population_in_Low_Income, FMI_plus_PNC = Female_Median_Income + Prop_no_certificate, FMI_plus_PHSD = Female_Median_Income + Prop_HS_diploma, FMI_plus_PTC = Female_Median_Income + Prop_trade_certificate, FMI_plus_PCD = Female_Median_Income + Prop_college_diploma, FMI_plus_PUB = Female_Median_Income + Prop_university_bachelor, FMI_plus_PPG = Female_Median_Income + Prop_postgraduate,
+                 PGTP_plus_MCD = Pct_Government_Transfer_Payments + Median_Commute_Dur, PGTP_plus_AITPI = Pct_Government_Transfer_Payments + Avg_Inc_Taxes_as_Pct_Inc, PGTP_plus_PPLI = Pct_Government_Transfer_Payments + Pct_Population_in_Low_Income, PGTP_plus_PNC = Pct_Government_Transfer_Payments + Prop_no_certificate, PGTP_plus_PHSD = Pct_Government_Transfer_Payments + Prop_HS_diploma, PGTP_plus_PTC = Pct_Government_Transfer_Payments + Prop_trade_certificate, PGTP_plus_PCD = Pct_Government_Transfer_Payments + Prop_college_diploma, PGTP_plus_PUB = Pct_Government_Transfer_Payments + Prop_university_bachelor, PGTP_plus_PPG = Pct_Government_Transfer_Payments + Prop_postgraduate,
+                 MCD_plus_AITPI = Median_Commute_Dur + Avg_Inc_Taxes_as_Pct_Inc, MCD_plus_PPLI = Median_Commute_Dur + Pct_Population_in_Low_Income, MCD_plus_PNC = Median_Commute_Dur + Prop_no_certificate, MCD_plus_PHSD = Median_Commute_Dur + Prop_HS_diploma, MCD_plus_PTC = Median_Commute_Dur + Prop_trade_certificate, MCD_plus_PCD = Median_Commute_Dur + Prop_college_diploma, MCD_plus_PUB = Median_Commute_Dur + Prop_university_bachelor, MCD_plus_PPG = Median_Commute_Dur + Prop_postgraduate,
+                 AITPI_plus_PPLI = Avg_Inc_Taxes_as_Pct_Inc + Pct_Population_in_Low_Income, AITPI_plus_PNC = Avg_Inc_Taxes_as_Pct_Inc + Prop_no_certificate, AITPI_plus_PHSD = Avg_Inc_Taxes_as_Pct_Inc + Prop_HS_diploma, AITPI_plus_PTC = Avg_Inc_Taxes_as_Pct_Inc + Prop_trade_certificate, AITPI_plus_PCD = Avg_Inc_Taxes_as_Pct_Inc + Prop_college_diploma, AITPI_plus_PUB = Avg_Inc_Taxes_as_Pct_Inc + Prop_university_bachelor, AITPI_plus_PPG = Avg_Inc_Taxes_as_Pct_Inc + Prop_postgraduate,
+                 PPLI_plus_PNC = Pct_Population_in_Low_Income + Prop_no_certificate, PPLI_plus_PHSD = Pct_Population_in_Low_Income + Prop_HS_diploma, PPLI_plus_PTC = Pct_Population_in_Low_Income + Prop_trade_certificate, PPLI_plus_PCD = Pct_Population_in_Low_Income + Prop_college_diploma, PPLI_plus_PUB = Pct_Population_in_Low_Income + Prop_university_bachelor, PPLI_plus_PPG = Pct_Population_in_Low_Income + Prop_postgraduate,
+                 PNC_plus_PHSD = Prop_no_certificate + Prop_HS_diploma, PNC_plus_PTC = Prop_no_certificate + Prop_trade_certificate, PNC_plus_PCD = Prop_no_certificate + Prop_college_diploma, PNC_plus_PUB = Prop_no_certificate + Prop_university_bachelor, PNC_plus_PPG = Prop_no_certificate + Prop_postgraduate,
+                 PHSD_plus_PTC = Prop_HS_diploma + Prop_trade_certificate, PHSD_plus_PCD = Prop_HS_diploma + Prop_college_diploma, PHSD_plus_PUB = Prop_HS_diploma + Prop_university_bachelor, PHSD_plus_PPG = Prop_HS_diploma + Prop_postgraduate,
+                 PTC_plus_PCD = Prop_trade_certificate + Prop_college_diploma, PTC_plus_PUB = Prop_trade_certificate + Prop_university_bachelor, PTC_plus_PPG = Prop_trade_certificate + Prop_postgraduate,
+                 PCD_plus_PUB = Prop_college_diploma + Prop_university_bachelor, PCD_plus_PPG = Prop_college_diploma + Prop_postgraduate,
+                 PUB_plus_PPG = Prop_university_bachelor + Prop_postgraduate,
+                 PDXMA = Pop_Den * Median_Age, PDXMI = Pop_Den * Median_Income, PDXMMI = Pop_Den * Male_Median_Income, PDXFMI = Pop_Den * Female_Median_Income, PDXPGTP = Pop_Den * Pct_Government_Transfer_Payments, PDXMCD = Pop_Den * Median_Commute_Dur, PDXAITPI = Pop_Den * Avg_Inc_Taxes_as_Pct_Inc, PDXPPLI = Pop_Den * Pct_Population_in_Low_Income, PDXPNC = Pop_Den * Prop_no_certificate, PDXPHSD = Pop_Den * Prop_HS_diploma, PDXPTC = Pop_Den * Prop_trade_certificate, PDXPCD = Pop_Den * Prop_college_diploma, PDXPUB = Pop_Den * Prop_university_bachelor, PDXPPG = Pop_Den * Prop_postgraduate,
+MAXMI = Median_Age * Median_Income, MAXMMI = Median_Age * Male_Median_Income, MAXFMI = Median_Age * Female_Median_Income, MAXPGTP = Median_Age * Pct_Government_Transfer_Payments, MAXMCD = Median_Age * Median_Commute_Dur, MAXAITPI = Median_Age * Avg_Inc_Taxes_as_Pct_Inc, MAXPPLI = Median_Age * Pct_Population_in_Low_Income, MAXPNC = Median_Age * Prop_no_certificate, MAXPHSD = Median_Age * Prop_HS_diploma, MAXPTC = Median_Age * Prop_trade_certificate, MAXPCD = Median_Age * Prop_college_diploma, MAXPUB = Median_Age * Prop_university_bachelor, MAXPPG = Median_Age * Prop_postgraduate,
+MIXMMI = Median_Income * Male_Median_Income, MIXFMI = Median_Income * Female_Median_Income, MIXPGTP = Median_Income * Pct_Government_Transfer_Payments, MIXMCD = Median_Income * Median_Commute_Dur, MIXAITPI = Median_Income * Avg_Inc_Taxes_as_Pct_Inc, MIXPPLI = Median_Income * Pct_Population_in_Low_Income, MIXPNC = Median_Income * Prop_no_certificate, MIXPHSD = Median_Income * Prop_HS_diploma, MIXPTC = Median_Income * Prop_trade_certificate, MIXPCD = Median_Income * Prop_college_diploma, MIXPUB = Median_Income * Prop_university_bachelor, MIXPPG = Median_Income * Prop_postgraduate,
+MMIXFMI = Male_Median_Income * Female_Median_Income, MMIXPGTP = Male_Median_Income * Pct_Government_Transfer_Payments, MMIXMCD = Male_Median_Income * Median_Commute_Dur, MMIXAITPI = Male_Median_Income * Avg_Inc_Taxes_as_Pct_Inc, MMIXPPLI = Male_Median_Income * Pct_Population_in_Low_Income, MMIXPNC = Male_Median_Income * Prop_no_certificate, MMIXPHSD = Male_Median_Income * Prop_HS_diploma, MMIXPTC = Male_Median_Income * Prop_trade_certificate, MMIXPCD = Male_Median_Income * Prop_college_diploma, MMIXPUB = Male_Median_Income * Prop_university_bachelor, MMIXPPG = Male_Median_Income * Prop_postgraduate,
+FMIXPGTP = Female_Median_Income * Pct_Government_Transfer_Payments, FMIXMCD = Female_Median_Income * Median_Commute_Dur, FMIXAITPI = Female_Median_Income * Avg_Inc_Taxes_as_Pct_Inc, FMIXPPLI = Female_Median_Income * Pct_Population_in_Low_Income, FMIXPNC = Female_Median_Income * Prop_no_certificate, FMIXPHSD = Female_Median_Income * Prop_HS_diploma, FMIXPTC = Female_Median_Income * Prop_trade_certificate, FMIXPCD = Female_Median_Income * Prop_college_diploma, FMIXPUB = Female_Median_Income * Prop_university_bachelor, FMIXPPG = Female_Median_Income * Prop_postgraduate,
+PGTPXMCD = Pct_Government_Transfer_Payments * Median_Commute_Dur, PGTPXAITPI = Pct_Government_Transfer_Payments * Avg_Inc_Taxes_as_Pct_Inc, PGTPXPPLI = Pct_Government_Transfer_Payments * Pct_Population_in_Low_Income, PGTPXPNC = Pct_Government_Transfer_Payments * Prop_no_certificate, PGTPXPHSD = Pct_Government_Transfer_Payments * Prop_HS_diploma, PGTPXPTC = Pct_Government_Transfer_Payments * Prop_trade_certificate, PGTPXPCD = Pct_Government_Transfer_Payments * Prop_college_diploma, PGTPXPUB = Pct_Government_Transfer_Payments * Prop_university_bachelor, PGTPXPPG = Pct_Government_Transfer_Payments * Prop_postgraduate,
+MCDXAITPI = Median_Commute_Dur * Avg_Inc_Taxes_as_Pct_Inc, MCDXPPLI = Median_Commute_Dur * Pct_Population_in_Low_Income, MCDXPNC = Median_Commute_Dur * Prop_no_certificate, MCDXPHSD = Median_Commute_Dur * Prop_HS_diploma, MCDXPTC = Median_Commute_Dur * Prop_trade_certificate, MCDXPCD = Median_Commute_Dur * Prop_college_diploma, MCDXPUB = Median_Commute_Dur * Prop_university_bachelor, MCDXPPG = Median_Commute_Dur * Prop_postgraduate,
+AITPIXPPLI = Avg_Inc_Taxes_as_Pct_Inc * Pct_Population_in_Low_Income, AITPIXPNC = Avg_Inc_Taxes_as_Pct_Inc * Prop_no_certificate, AITPIXPHSD = Avg_Inc_Taxes_as_Pct_Inc * Prop_HS_diploma, AITPIXPTC = Avg_Inc_Taxes_as_Pct_Inc * Prop_trade_certificate, AITPIXPCD = Avg_Inc_Taxes_as_Pct_Inc * Prop_college_diploma, AITPIXPUB = Avg_Inc_Taxes_as_Pct_Inc * Prop_university_bachelor, AITPIXPPG = Avg_Inc_Taxes_as_Pct_Inc * Prop_postgraduate,
+PPLIXPNC = Pct_Population_in_Low_Income * Prop_no_certificate, PPLIXPHSD = Pct_Population_in_Low_Income * Prop_HS_diploma, PPLIXPTC = Pct_Population_in_Low_Income * Prop_trade_certificate, PPLIXPCD = Pct_Population_in_Low_Income * Prop_college_diploma, PPLIXPUB = Pct_Population_in_Low_Income * Prop_university_bachelor, PPLIXPPG = Pct_Population_in_Low_Income * Prop_postgraduate,
+PNCXPHSD = Prop_no_certificate * Prop_HS_diploma, PNCXPTC = Prop_no_certificate * Prop_trade_certificate, PNCXPCD = Prop_no_certificate * Prop_college_diploma, PNCXPUB = Prop_no_certificate * Prop_university_bachelor, PNCXPPG = Prop_no_certificate * Prop_postgraduate,
+PHSDXPTC = Prop_HS_diploma * Prop_trade_certificate, PHSDXPCD = Prop_HS_diploma * Prop_college_diploma, PHSDXPUB = Prop_HS_diploma * Prop_university_bachelor, PHSDXPPG = Prop_HS_diploma * Prop_postgraduate,
+PTCXPCD = Prop_trade_certificate * Prop_college_diploma, PTCXPUB = Prop_trade_certificate * Prop_university_bachelor, PTCXPPG = Prop_trade_certificate * Prop_postgraduate,
+PCDXPUB = Prop_college_diploma * Prop_university_bachelor, PCDXPPG = Prop_college_diploma * Prop_postgraduate,
+PUBXPPG = Prop_university_bachelor * Prop_postgraduate,
+PD2_plus_MA2 = Pop_Den^2 + Median_Age^2, PD2_plus_MI2 = Pop_Den^2 + Median_Income^2, PD2_plus_MMI2 = Pop_Den^2 + Male_Median_Income^2, PD2_plus_FMI2 = Pop_Den^2 + Female_Median_Income^2, PD2_plus_PGTP2 = Pop_Den^2 + Pct_Government_Transfer_Payments^2, PD2_plus_MCD2 = Pop_Den^2 + Median_Commute_Dur^2, PD2_plus_AITPI2 = Pop_Den^2 + Avg_Inc_Taxes_as_Pct_Inc^2, PD2_plus_PPLI2 = Pop_Den^2 + Pct_Population_in_Low_Income^2, PD2_plus_PNC2 = Pop_Den^2 + Prop_no_certificate^2, PD2_plus_PHSD2 = Pop_Den^2 + Prop_HS_diploma^2, PD2_plus_PTC2 = Pop_Den^2 + Prop_trade_certificate^2, PD2_plus_PCD2 = Pop_Den^2 + Prop_college_diploma^2, PD2_plus_PUB2 = Pop_Den^2 + Prop_university_bachelor^2, PD2_plus_PPG2 = Pop_Den^2 + Prop_postgraduate^2,
+MA2_plus_MI2 = Median_Age^2 + Median_Income^2, MA2_plus_MMI2 = Median_Age^2 + Male_Median_Income^2, MA2_plus_FMI2 = Median_Age^2 + Female_Median_Income^2, MA2_plus_PGTP2 = Median_Age^2 + Pct_Government_Transfer_Payments^2, MA2_plus_MCD2 = Median_Age^2 + Median_Commute_Dur^2, MA2_plus_AITPI2 = Median_Age^2 + Avg_Inc_Taxes_as_Pct_Inc^2, MA2_plus_PPLI2 = Median_Age^2 + Pct_Population_in_Low_Income^2, MA2_plus_PNC2 = Median_Age^2 + Prop_no_certificate^2, MA2_plus_PHSD2 = Median_Age^2 + Prop_HS_diploma^2, MA2_plus_PTC2 = Median_Age^2 + Prop_trade_certificate^2, MA2_plus_PCD2 = Median_Age^2 + Prop_college_diploma^2, MA2_plus_PUB2 = Median_Age^2 + Prop_university_bachelor^2, MA2_plus_PPG2 = Median_Age^2 + Prop_postgraduate^2,
+MI2_plus_MMI2 = Median_Income^2 + Male_Median_Income^2, MI2_plus_FMI2 = Median_Income^2 + Female_Median_Income^2, MI2_plus_PGTP2 = Median_Income^2 + Pct_Government_Transfer_Payments^2, MI2_plus_MCD2 = Median_Income^2 + Median_Commute_Dur^2, MI2_plus_AITPI2 = Median_Income^2 + Avg_Inc_Taxes_as_Pct_Inc^2, MI2_plus_PPLI2 = Median_Income^2 + Pct_Population_in_Low_Income^2, MI2_plus_PNC2 = Median_Income^2 + Prop_no_certificate^2, MI2_plus_PHSD2 = Median_Income^2 + Prop_HS_diploma^2, MI2_plus_PTC2 = Median_Income^2 + Prop_trade_certificate^2, MI2_plus_PCD2 = Median_Income^2 + Prop_college_diploma^2, MI2_plus_PUB2 = Median_Income^2 + Prop_university_bachelor^2, MI2_plus_PPG2 = Median_Income^2 + Prop_postgraduate^2,
+MMI2_plus_FMI2 = Male_Median_Income^2 + Female_Median_Income^2, MMI2_plus_PGTP2 = Male_Median_Income^2 + Pct_Government_Transfer_Payments^2, MMI2_plus_MCD2 = Male_Median_Income^2 + Median_Commute_Dur^2, MMI2_plus_AITPI2 = Male_Median_Income^2 + Avg_Inc_Taxes_as_Pct_Inc^2, MMI2_plus_PPLI2 = Male_Median_Income^2 + Pct_Population_in_Low_Income^2, MMI2_plus_PNC2 = Male_Median_Income^2 + Prop_no_certificate^2, MMI2_plus_PHSD2 = Male_Median_Income^2 + Prop_HS_diploma^2, MMI2_plus_PTC2 = Male_Median_Income^2 + Prop_trade_certificate^2, MMI2_plus_PCD2 = Male_Median_Income^2 + Prop_college_diploma^2, MMI2_plus_PUB2 = Male_Median_Income^2 + Prop_university_bachelor^2, MMI2_plus_PPG2 = Male_Median_Income^2 + Prop_postgraduate^2,
+FMI2_plus_PGTP2 = Female_Median_Income^2 + Pct_Government_Transfer_Payments^2, FMI2_plus_MCD2 = Female_Median_Income^2 + Median_Commute_Dur^2, FMI2_plus_AITPI2 = Female_Median_Income^2 + Avg_Inc_Taxes_as_Pct_Inc^2, FMI2_plus_PPLI2 = Female_Median_Income^2 + Pct_Population_in_Low_Income^2, FMI2_plus_PNC2 = Female_Median_Income^2 + Prop_no_certificate^2, FMI2_plus_PHSD2 = Female_Median_Income^2 + Prop_HS_diploma^2, FMI2_plus_PTC2 = Female_Median_Income^2 + Prop_trade_certificate^2, FMI2_plus_PCD2 = Female_Median_Income^2 + Prop_college_diploma^2, FMI2_plus_PUB2 = Female_Median_Income^2 + Prop_university_bachelor^2, FMI2_plus_PPG2 = Female_Median_Income^2 + Prop_postgraduate^2,
+PGTP2_plus_MCD2 = Pct_Government_Transfer_Payments^2 + Median_Commute_Dur^2, PGTP2_plus_AITPI2 = Pct_Government_Transfer_Payments^2 + Avg_Inc_Taxes_as_Pct_Inc^2, PGTP2_plus_PPLI2 = Pct_Government_Transfer_Payments^2 + Pct_Population_in_Low_Income^2, PGTP2_plus_PNC2 = Pct_Government_Transfer_Payments^2 + Prop_no_certificate^2, PGTP2_plus_PHSD2 = Pct_Government_Transfer_Payments^2 + Prop_HS_diploma^2, PGTP2_plus_PTC2 = Pct_Government_Transfer_Payments^2 + Prop_trade_certificate^2, PGTP2_plus_PCD2 = Pct_Government_Transfer_Payments^2 + Prop_college_diploma^2, PGTP2_plus_PUB2 = Pct_Government_Transfer_Payments^2 + Prop_university_bachelor^2, PGTP2_plus_PPG2 = Pct_Government_Transfer_Payments^2 + Prop_postgraduate^2,
+MCD2_plus_AITPI2 = Median_Commute_Dur^2 + Avg_Inc_Taxes_as_Pct_Inc^2, MCD2_plus_PPLI2 = Median_Commute_Dur^2 + Pct_Population_in_Low_Income^2, MCD2_plus_PNC2 = Median_Commute_Dur^2 + Prop_no_certificate^2, MCD2_plus_PHSD2 = Median_Commute_Dur^2 + Prop_HS_diploma^2, MCD2_plus_PTC2 = Median_Commute_Dur^2 + Prop_trade_certificate^2, MCD2_plus_PCD2 = Median_Commute_Dur^2 + Prop_college_diploma^2, MCD2_plus_PUB2 = Median_Commute_Dur^2 + Prop_university_bachelor^2, MCD2_plus_PPG2 = Median_Commute_Dur^2 + Prop_postgraduate^2,
+AITPI2_plus_PPLI2 = Avg_Inc_Taxes_as_Pct_Inc^2 + Pct_Population_in_Low_Income^2, AITPI2_plus_PNC2 = Avg_Inc_Taxes_as_Pct_Inc^2 + Prop_no_certificate^2, AITPI2_plus_PHSD2 = Avg_Inc_Taxes_as_Pct_Inc^2 + Prop_HS_diploma^2, AITPI2_plus_PTC2 = Avg_Inc_Taxes_as_Pct_Inc^2 + Prop_trade_certificate^2, AITPI2_plus_PCD2 = Avg_Inc_Taxes_as_Pct_Inc^2 + Prop_college_diploma^2, AITPI2_plus_PUB2 = Avg_Inc_Taxes_as_Pct_Inc^2 + Prop_university_bachelor^2, AITPI2_plus_PPG2 = Avg_Inc_Taxes_as_Pct_Inc^2 + Prop_postgraduate^2,
+PPLI2_plus_PNC2 = Pct_Population_in_Low_Income^2 + Prop_no_certificate^2, PPLI2_plus_PHSD2 = Pct_Population_in_Low_Income^2 + Prop_HS_diploma^2, PPLI2_plus_PTC2 = Pct_Population_in_Low_Income^2 + Prop_trade_certificate^2, PPLI2_plus_PCD2 = Pct_Population_in_Low_Income^2 + Prop_college_diploma^2, PPLI2_plus_PUB2 = Pct_Population_in_Low_Income^2 + Prop_university_bachelor^2, PPLI2_plus_PPG2 = Pct_Population_in_Low_Income^2 + Prop_postgraduate^2,
+PNC2_plus_PHSD2 = Prop_no_certificate^2 + Prop_HS_diploma^2, PNC2_plus_PTC2 = Prop_no_certificate^2 + Prop_trade_certificate^2, PNC2_plus_PCD2 = Prop_no_certificate^2 + Prop_college_diploma^2, PNC2_plus_PUB2 = Prop_no_certificate^2 + Prop_university_bachelor^2, PNC2_plus_PPG2 = Prop_no_certificate^2 + Prop_postgraduate^2,
+PHSD2_plus_PTC2 = Prop_HS_diploma^2 + Prop_trade_certificate^2, PHSD2_plus_PCD2 = Prop_HS_diploma^2 + Prop_college_diploma^2, PHSD2_plus_PUB2 = Prop_HS_diploma^2 + Prop_university_bachelor^2, PHSD2_plus_PPG2 = Prop_HS_diploma^2 + Prop_postgraduate^2,
+PTC2_plus_PCD2 = Prop_trade_certificate^2 + Prop_college_diploma^2, PTC2_plus_PUB2 = Prop_trade_certificate^2 + Prop_university_bachelor^2, PTC2_plus_PPG2 = Prop_trade_certificate^2 + Prop_postgraduate^2,
+PCD2_plus_PUB2 = Prop_college_diploma^2 + Prop_university_bachelor^2, PCD2_plus_PPG2 = Prop_college_diploma^2 + Prop_postgraduate^2,
+PUB2_plus_PPG2 = Prop_university_bachelor^2 + Prop_postgraduate^2,
+expPD_plus_expMA = exp(Pop_Den) + exp( Median_Age), expPD_plus_expMI = exp(Pop_Den) + exp( Median_Income), expPD_plus_expMMI = exp(Pop_Den) + exp( Male_Median_Income), expPD_plus_expFMI = exp(Pop_Den) + exp( Female_Median_Income), expPD_plus_expPGTP = exp(Pop_Den) + exp( Pct_Government_Transfer_Payments), expPD_plus_expMCD = exp(Pop_Den) + exp( Median_Commute_Dur), expPD_plus_expAITPI = exp(Pop_Den) + exp( Avg_Inc_Taxes_as_Pct_Inc), expPD_plus_expPPLI = exp(Pop_Den) + exp( Pct_Population_in_Low_Income), expPD_plus_expPNC = exp(Pop_Den) + exp( Prop_no_certificate), expPD_plus_expPHSD = exp(Pop_Den) + exp( Prop_HS_diploma), expPD_plus_expPTC = exp(Pop_Den) + exp( Prop_trade_certificate), expPD_plus_expPCD = exp(Pop_Den) + exp( Prop_college_diploma), expPD_plus_expPUB = exp(Pop_Den) + exp( Prop_university_bachelor), expPD_plus_expPPG = exp(Pop_Den) + exp( Prop_postgraduate),
+expMA_plus_expMI = exp(Median_Age) + exp( Median_Income), expMA_plus_expMMI = exp(Median_Age) + exp( Male_Median_Income), expMA_plus_expFMI = exp(Median_Age) + exp( Female_Median_Income), expMA_plus_expPGTP = exp(Median_Age) + exp( Pct_Government_Transfer_Payments), expMA_plus_expMCD = exp(Median_Age) + exp( Median_Commute_Dur), expMA_plus_expAITPI = exp(Median_Age) + exp( Avg_Inc_Taxes_as_Pct_Inc), expMA_plus_expPPLI = exp(Median_Age) + exp( Pct_Population_in_Low_Income), expMA_plus_expPNC = exp(Median_Age) + exp( Prop_no_certificate), expMA_plus_expPHSD = exp(Median_Age) + exp( Prop_HS_diploma), expMA_plus_expPTC = exp(Median_Age) + exp( Prop_trade_certificate), expMA_plus_expPCD = exp(Median_Age) + exp( Prop_college_diploma), expMA_plus_expPUB = exp(Median_Age) + exp( Prop_university_bachelor), expMA_plus_expPPG = exp(Median_Age) + exp( Prop_postgraduate),
+expMI_plus_expMMI = exp(Median_Income) + exp( Male_Median_Income), expMI_plus_expFMI = exp(Median_Income) + exp( Female_Median_Income), expMI_plus_expPGTP = exp(Median_Income) + exp( Pct_Government_Transfer_Payments), expMI_plus_expMCD = exp(Median_Income) + exp( Median_Commute_Dur), expMI_plus_expAITPI = exp(Median_Income) + exp( Avg_Inc_Taxes_as_Pct_Inc), expMI_plus_expPPLI = exp(Median_Income) + exp( Pct_Population_in_Low_Income), expMI_plus_expPNC = exp(Median_Income) + exp( Prop_no_certificate), expMI_plus_expPHSD = exp(Median_Income) + exp( Prop_HS_diploma), expMI_plus_expPTC = exp(Median_Income) + exp( Prop_trade_certificate), expMI_plus_expPCD = exp(Median_Income) + exp( Prop_college_diploma), expMI_plus_expPUB = exp(Median_Income) + exp( Prop_university_bachelor), expMI_plus_expPPG = exp(Median_Income) + exp( Prop_postgraduate),
+expMMI_plus_expFMI = exp(Male_Median_Income) + exp( Female_Median_Income), expMMI_plus_expPGTP = exp(Male_Median_Income) + exp( Pct_Government_Transfer_Payments), expMMI_plus_expMCD = exp(Male_Median_Income) + exp( Median_Commute_Dur), expMMI_plus_expAITPI = exp(Male_Median_Income) + exp( Avg_Inc_Taxes_as_Pct_Inc), expMMI_plus_expPPLI = exp(Male_Median_Income) + exp( Pct_Population_in_Low_Income), expMMI_plus_expPNC = exp(Male_Median_Income) + exp( Prop_no_certificate), expMMI_plus_expPHSD = exp(Male_Median_Income) + exp( Prop_HS_diploma), expMMI_plus_expPTC = exp(Male_Median_Income) + exp( Prop_trade_certificate), expMMI_plus_expPCD = exp(Male_Median_Income) + exp( Prop_college_diploma), expMMI_plus_expPUB = exp(Male_Median_Income) + exp( Prop_university_bachelor), expMMI_plus_expPPG = exp(Male_Median_Income) + exp( Prop_postgraduate),
+expFMI_plus_expPGTP = exp(Female_Median_Income) + exp( Pct_Government_Transfer_Payments), expFMI_plus_expMCD = exp(Female_Median_Income) + exp( Median_Commute_Dur), expFMI_plus_expAITPI = exp(Female_Median_Income) + exp( Avg_Inc_Taxes_as_Pct_Inc), expFMI_plus_expPPLI = exp(Female_Median_Income) + exp( Pct_Population_in_Low_Income), expFMI_plus_expPNC = exp(Female_Median_Income) + exp( Prop_no_certificate), expFMI_plus_expPHSD = exp(Female_Median_Income) + exp( Prop_HS_diploma), expFMI_plus_expPTC = exp(Female_Median_Income) + exp( Prop_trade_certificate), expFMI_plus_expPCD = exp(Female_Median_Income) + exp( Prop_college_diploma), expFMI_plus_expPUB = exp(Female_Median_Income) + exp( Prop_university_bachelor), expFMI_plus_expPPG = exp(Female_Median_Income) + exp( Prop_postgraduate),
+expPGTP_plus_expMCD = exp(Pct_Government_Transfer_Payments) + exp( Median_Commute_Dur), expPGTP_plus_expAITPI = exp(Pct_Government_Transfer_Payments) + exp( Avg_Inc_Taxes_as_Pct_Inc), expPGTP_plus_expPPLI = exp(Pct_Government_Transfer_Payments) + exp( Pct_Population_in_Low_Income), expPGTP_plus_expPNC = exp(Pct_Government_Transfer_Payments) + exp( Prop_no_certificate), expPGTP_plus_expPHSD = exp(Pct_Government_Transfer_Payments) + exp( Prop_HS_diploma), expPGTP_plus_expPTC = exp(Pct_Government_Transfer_Payments) + exp( Prop_trade_certificate), expPGTP_plus_expPCD = exp(Pct_Government_Transfer_Payments) + exp( Prop_college_diploma), expPGTP_plus_expPUB = exp(Pct_Government_Transfer_Payments) + exp( Prop_university_bachelor), expPGTP_plus_expPPG = exp(Pct_Government_Transfer_Payments) + exp( Prop_postgraduate),
+expMCD_plus_expAITPI = exp(Median_Commute_Dur) + exp( Avg_Inc_Taxes_as_Pct_Inc), expMCD_plus_expPPLI = exp(Median_Commute_Dur) + exp( Pct_Population_in_Low_Income), expMCD_plus_expPNC = exp(Median_Commute_Dur) + exp( Prop_no_certificate), expMCD_plus_expPHSD = exp(Median_Commute_Dur) + exp( Prop_HS_diploma), expMCD_plus_expPTC = exp(Median_Commute_Dur) + exp( Prop_trade_certificate), expMCD_plus_expPCD = exp(Median_Commute_Dur) + exp( Prop_college_diploma), expMCD_plus_expPUB = exp(Median_Commute_Dur) + exp( Prop_university_bachelor), expMCD_plus_expPPG = exp(Median_Commute_Dur) + exp( Prop_postgraduate),
+expAITPI_plus_expPPLI = exp(Avg_Inc_Taxes_as_Pct_Inc) + exp( Pct_Population_in_Low_Income), expAITPI_plus_expPNC = exp(Avg_Inc_Taxes_as_Pct_Inc) + exp( Prop_no_certificate), expAITPI_plus_expPHSD = exp(Avg_Inc_Taxes_as_Pct_Inc) + exp( Prop_HS_diploma), expAITPI_plus_expPTC = exp(Avg_Inc_Taxes_as_Pct_Inc) + exp( Prop_trade_certificate), expAITPI_plus_expPCD = exp(Avg_Inc_Taxes_as_Pct_Inc) + exp( Prop_college_diploma), expAITPI_plus_expPUB = exp(Avg_Inc_Taxes_as_Pct_Inc) + exp( Prop_university_bachelor), expAITPI_plus_expPPG = exp(Avg_Inc_Taxes_as_Pct_Inc) + exp( Prop_postgraduate),
+expPPLI_plus_expPNC = exp(Pct_Population_in_Low_Income) + exp( Prop_no_certificate), expPPLI_plus_expPHSD = exp(Pct_Population_in_Low_Income) + exp( Prop_HS_diploma), expPPLI_plus_expPTC = exp(Pct_Population_in_Low_Income) + exp( Prop_trade_certificate), expPPLI_plus_expPCD = exp(Pct_Population_in_Low_Income) + exp( Prop_college_diploma), expPPLI_plus_expPUB = exp(Pct_Population_in_Low_Income) + exp( Prop_university_bachelor), expPPLI_plus_expPPG = exp(Pct_Population_in_Low_Income) + exp( Prop_postgraduate),
+expPNC_plus_expPHSD = exp(Prop_no_certificate) + exp( Prop_HS_diploma), expPNC_plus_expPTC = exp(Prop_no_certificate) + exp( Prop_trade_certificate), expPNC_plus_expPCD = exp(Prop_no_certificate) + exp( Prop_college_diploma), expPNC_plus_expPUB = exp(Prop_no_certificate) + exp( Prop_university_bachelor), expPNC_plus_expPPG = exp(Prop_no_certificate) + exp( Prop_postgraduate),
+expPHSD_plus_expPTC = exp(Prop_HS_diploma) + exp( Prop_trade_certificate), expPHSD_plus_expPCD = exp(Prop_HS_diploma) + exp( Prop_college_diploma), expPHSD_plus_expPUB = exp(Prop_HS_diploma) + exp( Prop_university_bachelor), expPHSD_plus_expPPG = exp(Prop_HS_diploma) + exp( Prop_postgraduate),
+expPTC_plus_expPCD = exp(Prop_trade_certificate) + exp( Prop_college_diploma), expPTC_plus_expPUB = exp(Prop_trade_certificate) + exp( Prop_university_bachelor), expPTC_plus_expPPG = exp(Prop_trade_certificate) + exp( Prop_postgraduate),
+expPCD_plus_expPUB = exp(Prop_college_diploma) + exp( Prop_university_bachelor), expPCD_plus_expPPG = exp(Prop_college_diploma) + exp( Prop_postgraduate),
+expPUB_plus_expPPG = exp(Prop_university_bachelor) + exp( Prop_postgraduate),
+expPDXexpMA = exp(Pop_Den) * exp( Median_Age), expPDXexpMI = exp(Pop_Den) * exp( Median_Income), expPDXexpMMI = exp(Pop_Den) * exp( Male_Median_Income), expPDXexpFMI = exp(Pop_Den) * exp( Female_Median_Income), expPDXexpPGTP = exp(Pop_Den) * exp( Pct_Government_Transfer_Payments), expPDXexpMCD = exp(Pop_Den) * exp( Median_Commute_Dur), expPDXexpAITPI = exp(Pop_Den) * exp( Avg_Inc_Taxes_as_Pct_Inc), expPDXexpPPLI = exp(Pop_Den) * exp( Pct_Population_in_Low_Income), expPDXexpPNC = exp(Pop_Den) * exp( Prop_no_certificate), expPDXexpPHSD = exp(Pop_Den) * exp( Prop_HS_diploma), expPDXexpPTC = exp(Pop_Den) * exp( Prop_trade_certificate), expPDXexpPCD = exp(Pop_Den) * exp( Prop_college_diploma), expPDXexpPUB = exp(Pop_Den) * exp( Prop_university_bachelor), expPDXexpPPG = exp(Pop_Den) * exp( Prop_postgraduate),
+expMAXexpMI = exp(Median_Age) * exp( Median_Income), expMAXexpMMI = exp(Median_Age) * exp( Male_Median_Income), expMAXexpFMI = exp(Median_Age) * exp( Female_Median_Income), expMAXexpPGTP = exp(Median_Age) * exp( Pct_Government_Transfer_Payments), expMAXexpMCD = exp(Median_Age) * exp( Median_Commute_Dur), expMAXexpAITPI = exp(Median_Age) * exp( Avg_Inc_Taxes_as_Pct_Inc), expMAXexpPPLI = exp(Median_Age) * exp( Pct_Population_in_Low_Income), expMAXexpPNC = exp(Median_Age) * exp( Prop_no_certificate), expMAXexpPHSD = exp(Median_Age) * exp( Prop_HS_diploma), expMAXexpPTC = exp(Median_Age) * exp( Prop_trade_certificate), expMAXexpPCD = exp(Median_Age) * exp( Prop_college_diploma), expMAXexpPUB = exp(Median_Age) * exp( Prop_university_bachelor), expMAXexpPPG = exp(Median_Age) * exp( Prop_postgraduate),
+expMIXexpMMI = exp(Median_Income) * exp( Male_Median_Income), expMIXexpFMI = exp(Median_Income) * exp( Female_Median_Income), expMIXexpPGTP = exp(Median_Income) * exp( Pct_Government_Transfer_Payments), expMIXexpMCD = exp(Median_Income) * exp( Median_Commute_Dur), expMIXexpAITPI = exp(Median_Income) * exp( Avg_Inc_Taxes_as_Pct_Inc), expMIXexpPPLI = exp(Median_Income) * exp( Pct_Population_in_Low_Income), expMIXexpPNC = exp(Median_Income) * exp( Prop_no_certificate), expMIXexpPHSD = exp(Median_Income) * exp( Prop_HS_diploma), expMIXexpPTC = exp(Median_Income) * exp( Prop_trade_certificate), expMIXexpPCD = exp(Median_Income) * exp( Prop_college_diploma), expMIXexpPUB = exp(Median_Income) * exp( Prop_university_bachelor), expMIXexpPPG = exp(Median_Income) * exp( Prop_postgraduate),
+expMMIXexpFMI = exp(Male_Median_Income) * exp( Female_Median_Income), expMMIXexpPGTP = exp(Male_Median_Income) * exp( Pct_Government_Transfer_Payments), expMMIXexpMCD = exp(Male_Median_Income) * exp( Median_Commute_Dur), expMMIXexpAITPI = exp(Male_Median_Income) * exp( Avg_Inc_Taxes_as_Pct_Inc), expMMIXexpPPLI = exp(Male_Median_Income) * exp( Pct_Population_in_Low_Income), expMMIXexpPNC = exp(Male_Median_Income) * exp( Prop_no_certificate), expMMIXexpPHSD = exp(Male_Median_Income) * exp( Prop_HS_diploma), expMMIXexpPTC = exp(Male_Median_Income) * exp( Prop_trade_certificate), expMMIXexpPCD = exp(Male_Median_Income) * exp( Prop_college_diploma), expMMIXexpPUB = exp(Male_Median_Income) * exp( Prop_university_bachelor), expMMIXexpPPG = exp(Male_Median_Income) * exp( Prop_postgraduate),
+expFMIXexpPGTP = exp(Female_Median_Income) * exp( Pct_Government_Transfer_Payments), expFMIXexpMCD = exp(Female_Median_Income) * exp( Median_Commute_Dur), expFMIXexpAITPI = exp(Female_Median_Income) * exp( Avg_Inc_Taxes_as_Pct_Inc), expFMIXexpPPLI = exp(Female_Median_Income) * exp( Pct_Population_in_Low_Income), expFMIXexpPNC = exp(Female_Median_Income) * exp( Prop_no_certificate), expFMIXexpPHSD = exp(Female_Median_Income) * exp( Prop_HS_diploma), expFMIXexpPTC = exp(Female_Median_Income) * exp( Prop_trade_certificate), expFMIXexpPCD = exp(Female_Median_Income) * exp( Prop_college_diploma), expFMIXexpPUB = exp(Female_Median_Income) * exp( Prop_university_bachelor), expFMIXexpPPG = exp(Female_Median_Income) * exp( Prop_postgraduate),
+expPGTPXexpMCD = exp(Pct_Government_Transfer_Payments) * exp( Median_Commute_Dur), expPGTPXexpAITPI = exp(Pct_Government_Transfer_Payments) * exp( Avg_Inc_Taxes_as_Pct_Inc), expPGTPXexpPPLI = exp(Pct_Government_Transfer_Payments) * exp( Pct_Population_in_Low_Income), expPGTPXexpPNC = exp(Pct_Government_Transfer_Payments) * exp( Prop_no_certificate), expPGTPXexpPHSD = exp(Pct_Government_Transfer_Payments) * exp( Prop_HS_diploma), expPGTPXexpPTC = exp(Pct_Government_Transfer_Payments) * exp( Prop_trade_certificate), expPGTPXexpPCD = exp(Pct_Government_Transfer_Payments) * exp( Prop_college_diploma), expPGTPXexpPUB = exp(Pct_Government_Transfer_Payments) * exp( Prop_university_bachelor), expPGTPXexpPPG = exp(Pct_Government_Transfer_Payments) * exp( Prop_postgraduate),
+expMCDXexpAITPI = exp(Median_Commute_Dur) * exp( Avg_Inc_Taxes_as_Pct_Inc), expMCDXexpPPLI = exp(Median_Commute_Dur) * exp( Pct_Population_in_Low_Income), expMCDXexpPNC = exp(Median_Commute_Dur) * exp( Prop_no_certificate), expMCDXexpPHSD = exp(Median_Commute_Dur) * exp( Prop_HS_diploma), expMCDXexpPTC = exp(Median_Commute_Dur) * exp( Prop_trade_certificate), expMCDXexpPCD = exp(Median_Commute_Dur) * exp( Prop_college_diploma), expMCDXexpPUB = exp(Median_Commute_Dur) * exp( Prop_university_bachelor), expMCDXexpPPG = exp(Median_Commute_Dur) * exp( Prop_postgraduate),
+expAITPIXexpPPLI = exp(Avg_Inc_Taxes_as_Pct_Inc) * exp( Pct_Population_in_Low_Income), expAITPIXexpPNC = exp(Avg_Inc_Taxes_as_Pct_Inc) * exp( Prop_no_certificate), expAITPIXexpPHSD = exp(Avg_Inc_Taxes_as_Pct_Inc) * exp( Prop_HS_diploma), expAITPIXexpPTC = exp(Avg_Inc_Taxes_as_Pct_Inc) * exp( Prop_trade_certificate), expAITPIXexpPCD = exp(Avg_Inc_Taxes_as_Pct_Inc) * exp( Prop_college_diploma), expAITPIXexpPUB = exp(Avg_Inc_Taxes_as_Pct_Inc) * exp( Prop_university_bachelor), expAITPIXexpPPG = exp(Avg_Inc_Taxes_as_Pct_Inc) * exp( Prop_postgraduate),
+expPPLIXexpPNC = exp(Pct_Population_in_Low_Income) * exp( Prop_no_certificate), expPPLIXexpPHSD = exp(Pct_Population_in_Low_Income) * exp( Prop_HS_diploma), expPPLIXexpPTC = exp(Pct_Population_in_Low_Income) * exp( Prop_trade_certificate), expPPLIXexpPCD = exp(Pct_Population_in_Low_Income) * exp( Prop_college_diploma), expPPLIXexpPUB = exp(Pct_Population_in_Low_Income) * exp( Prop_university_bachelor), expPPLIXexpPPG = exp(Pct_Population_in_Low_Income) * exp( Prop_postgraduate),
+expPNCXexpPHSD = exp(Prop_no_certificate) * exp( Prop_HS_diploma), expPNCXexpPTC = exp(Prop_no_certificate) * exp( Prop_trade_certificate), expPNCXexpPCD = exp(Prop_no_certificate) * exp( Prop_college_diploma), expPNCXexpPUB = exp(Prop_no_certificate) * exp( Prop_university_bachelor), expPNCXexpPPG = exp(Prop_no_certificate) * exp( Prop_postgraduate),
+expPHSDXexpPTC = exp(Prop_HS_diploma) * exp( Prop_trade_certificate), expPHSDXexpPCD = exp(Prop_HS_diploma) * exp( Prop_college_diploma), expPHSDXexpPUB = exp(Prop_HS_diploma) * exp( Prop_university_bachelor), expPHSDXexpPPG = exp(Prop_HS_diploma) * exp( Prop_postgraduate),
+expPTCXexpPCD = exp(Prop_trade_certificate) * exp( Prop_college_diploma), expPTCXexpPUB = exp(Prop_trade_certificate) * exp( Prop_university_bachelor), expPTCXexpPPG = exp(Prop_trade_certificate) * exp( Prop_postgraduate),
+expPCDXexpPUB = exp(Prop_college_diploma) * exp( Prop_university_bachelor), expPCDXexpPPG = exp(Prop_college_diploma) * exp( Prop_postgraduate),
+expPUBXexpPPG = exp(Prop_university_bachelor) * exp( Prop_postgraduate))
+```
+
+The next step was to train a model that included IBFs as above. The initial model had eleven terminal nodes, but upon examination was pruned to produce the model shown in Figure \ref{fig:fig22-tree-basis-election}. The $pseudo-R^2$ of this model is $0.44$. Note that three of the partitions in this model are oblique, and one is non-linear. Population density (PD), which appeared in the model with orthogonal partitions, is still part of this model in the last interior node. However, percentage of population living in poverty is not. Instead, average income taxes as percentage of income (AITPI), median age (MA), and several academic achievement variables entered the model (proportion of trade certificates: PTC; proportion of college diploma: PCD; proportion of high school diploma: PHSD; proportion of university bachelor: PUB; and propotion with no certificate: PNC). These variables are often correlated with population living in poverty, but give a more refined view of the characteristics of populations that associate with voter turnout.
+
+```{r train-basis-election, include=FALSE}
+election_mod2 <- rpart(Voter_Turnout ~ ., data.model)
+#election_mod1_summary <- summary(election_mod1)
+printcp(election_mod2)
+```
+
+```{r prune-election-basis, echo=FALSE}
+#Prune
+election_mod2_pruned <- prune(election_mod2, cp = 0.049738)
+```
+
+```{r fig22-tree-basis-election, echo=FALSE, fig.cap="\\label{fig:fig22-tree-basis-election}Decision tree with non-orthogonal/non-linear partitions, Ontario voter turnout", fig.show='asis'}
+election_mod2_pruned$frame$var <- plyr::revalue(election_mod2_pruned$frame$var, c("<leaf>" = "<leaf>", 
+                                                              "AITPI_plus_PTC"="AITPI + PTC",
+                                                              "MA_plus_PCD"="MA + PCD",
+                                                              "PDXPNC"="PD x PNC",
+                                                              "PHSD_plus_PUB"="PHSD + PUB"))
+rpart.plot(election_mod2_pruned, cex = 0.75, digits = 4)
+```
+
+In the case of a multifeature dataset, interpretation of a DT with IBFs is not as straightforward as it was for orthogonal partitions, particularly considering that the variables were centered and scaled. In order to enhance the interpretability of the results of models with IBFs, we propose to use a device we call decision charts. These charts allow us to plot the decision boundaries in the space of the two basis implied by each node of the tree. By recentering and rescaling the decision boundaries back to the units of the original basis vectors, a simple protocol can be devised to interpret the results of a model. The maps in the previous two examples showing ethnic boundaries and market segments are essentially decision charts for the case of two features. An example of a set of decision charts for the multifeature voter turnout model is shown in Figure \ref{fig:fig23-election-decision-charts}.
+
+```{r decision-chart-1, echo=FALSE}
+#Plot splits in original units/create decision charts:
+new_data <- data.frame(X = c(min(data$Avg_Inc_Taxes_as_Pct_Inc), min(data$Avg_Inc_Taxes_as_Pct_Inc) + 
+                               0.7896 *(max(data$Avg_Inc_Taxes_as_Pct_Inc) - min(data$Avg_Inc_Taxes_as_Pct_Inc)),
+                             min(data$Avg_Inc_Taxes_as_Pct_Inc)
+                             ),
+                       Y = c(min(data$Prop_trade_certificate),
+                             min(data$Prop_trade_certificate), 
+                             min(data$Prop_trade_certificate) + 
+                               0.7896 *(max(data$Prop_trade_certificate) - min(data$Prop_trade_certificate))
+                             ),
+                       group = c(1,1,1))
+
+p1 <- ggplot(data = new_data, aes(x = X, y = Y, group = group)) +
+  geom_polygon(fill = brewer.pal(9, "Blues")[1], color = "black") +
+  xlab("Average Income Tax as % of Income") +
+  ylab("Prop of Trade Certificates") +
+  scale_x_continuous(limits = c(min(data$Avg_Inc_Taxes_as_Pct_Inc),
+                                max(data$Avg_Inc_Taxes_as_Pct_Inc)), 
+                     expand = c(0, 0)) +
+  scale_y_continuous(limits = c(min(data$Prop_trade_certificate),
+                                max(data$Prop_trade_certificate)), 
+                     expand = c(0, 0)) +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1)
+  ) + 
+  ggtitle("Chart 1") +
+  annotate("text", x = 9.5, y = 0.0675, label = "Turnout = 52.43%") + 
+  annotate("text", x = 17.5, y = 0.125, label = "See Chart 2")
+```
+
+```{r decision-chart-2, echo=FALSE}
+new_data <- data.frame(X = c(min(data$Median_Age),
+                             min(data$Median_Age) + 
+                               0.7158 *(max(data$Median_Age) - min(data$Median_Age)),
+                             min(data$Median_Age)
+                             ),
+                       Y = c(min(data$Prop_college_diploma),
+                             min(data$Prop_college_diploma), 
+                             min(data$Prop_college_diploma) + 
+                               0.7158 *(max(data$Prop_college_diploma) - min(data$Prop_college_diploma))
+                             ),
+                       group = c(1,1,1))
+
+p2 <- ggplot(data = new_data, aes(x = X, y = Y, group = group)) +
+  geom_polygon(fill = brewer.pal(9, "Blues")[2], color = "black") +
+  xlab("Median Age") +
+  ylab("Prop of College Diploma") +
+  scale_x_continuous(limits = c(min(data$Median_Age),
+                                max(data$Median_Age)), 
+                     expand = c(0, 0)) +
+  scale_y_continuous(limits = c(min(data$Prop_college_diploma),
+                                max(data$Prop_college_diploma)), 
+                     expand = c(0, 0)) +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1)
+  ) + 
+  ggtitle("Chart 2") +
+  annotate("text", x = 21, y = 0.21, label = "Turnout = 52.64%") +
+  annotate("text", x = 40, y = 0.295, label = "See Chart 3")
+```
+
+```{r decision-chart-3, echo=FALSE}
+new_data <- data.frame(X = c(min(data$Prop_HS_diploma),
+                             min(data$Prop_HS_diploma) + 
+                               0.8426 *(max(data$Prop_HS_diploma) - min(data$Prop_HS_diploma)),
+                             min(data$Prop_HS_diploma)
+                             ),
+                       Y = c(min(data$Prop_university_bachelor),
+                             min(data$Prop_university_bachelor), 
+                             min(data$Prop_university_bachelor) + 
+                               0.8426 *(max(data$Prop_university_bachelor) - min(data$Prop_university_bachelor))
+                             ),
+                       group = c(1,1,1))
+
+p3 <- ggplot(data = new_data, aes(x = X, y = Y, group = group)) +
+  geom_polygon(fill = brewer.pal(9, "Blues")[2], color = "black") +
+  xlab("Prop High School Diploma") +
+  ylab("Prop University Bachelor") +
+  scale_x_continuous(limits = c(min(data$Prop_HS_diploma),
+                                max(data$Prop_HS_diploma)), 
+                     expand = c(0, 0)) +
+  scale_y_continuous(limits = c(min(data$Prop_university_bachelor),
+                                max(data$Prop_university_bachelor)), 
+                     expand = c(0, 0)) +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1)
+  ) + 
+  ggtitle("Chart 3") +
+  annotate("text", x = 0.21, y = 0.125, label = "Turnout = 55.30%") +
+  annotate("text", x = 0.28, y = 0.23, label = "See Chart 4")
+```
+
+```{r decision-chart-4, echo=FALSE}
+xval <- seq(from = 0.001, to = 0.999, by = 0.001)
+yval <- 0.006765 / xval
+yval_r <- rescale(yval, to = c(min(data$Prop_no_certificate), max(data$Prop_no_certificate)))
+xval_r <- rescale(xval, to = c(min(data$Pop_Den), max(data$Pop_Den)))
+
+new_data <- data.frame(x = xval_r, y = yval_r)
+
+p4 <- ggplot(data = new_data, aes(x = x, y = y)) +
+    geom_line() +
+    geom_ribbon(aes(x=x,ymax=y),ymin=0,alpha=0.3, fill = brewer.pal(9, "Blues")[9]) +
+    geom_ribbon(aes(x=x,ymin=y),ymax=max(data$Prop_no_certificate),alpha=0.3, fill = brewer.pal(9, "Blues")[7]) +
+    xlab("Population Density") +
+  ylab("Prop No Certificate") +
+  scale_x_continuous(limits = c(min(data$Pop_Den), 200),
+                     expand = c(0, 0)) +
+  scale_y_continuous(limits = c(min(data$Prop_no_certificate), max(data$Prop_no_certificate)),
+                     expand = c(0, 0)) +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1)) + 
+  ggtitle("Chart 4") +
+  annotate("text", x = 25, y = 0.075, label = "61.23%") +
+  annotate("text", x = 150, y = 0.23, label = "Turnout = 58.28%")
+```
+
+```{r fig23-election-decision-charts, fig.cap="\\label{fig:fig23-election-decision-charts}Decision charts for voter turnout", warning=FALSE, echo=FALSE}
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+As seen in the figure, low voter turnouts are associated with Electoral Districts where income taxes as percentage of income are on average low, and that _simultaneously_ have relatively high proportions of residents with trade certificates (an indication of the presence of blue collar workers). High voter turnout rates, in contrast, are associated with Electoral Districts that tend to be older and better educated (tops of Charts 2 and 3), and with high population density _or_ low population density and a high proportion of people without certificate (bottom of Chart 4). 
+
+7 Conclusions and Directions for Future Research
+===================
+
+Decision Trees are a popular data analysis technique used in a wide range of applications. The somewhat restrictive nature of binary orthogonal partitions has been recognized in the past, and a number of methods have been proposed in the literature to allow for oblique partitions. In this paper, we have proposed a new strategy to induce oblique and non-linear partitions for DTs. This is achieved by introducing Interactive Basis Functions. The use of IBFs is attractive because it can induce partitions of different shapes at a relatively low computational cost. Furthermore, the underlying recursive-partition algorithm is not changed, which means that IBFs can be used with any implementation of DTs in existing software.
+
+A benchmarking exercise shows that the use of IBFs can improve the accuracy of the model and/or produce more parsimonious models, without greatly increasing computation time. Furthermore, three case studies illustrated the application and potential advantages of IBFs. In one spatial classification example, the accuracy of the model was maintained but potentially more appealing boundaries were identified. In a market segmentation example, likewise, accuracy was maintained but a more parsimonious and theoretically consistent model was obtained. And in a multifeature model of voter turnout, IBFs led to a better model fit and a more parsimonious model.
+
+One downside of using oblique/non-linear partitions in DTs is that the interpretability of the typical visual output (as a tree with binary branches) becomes compromised. To remedy this situation we introduced a new tool called decision charts, a set of visual devices where new inputs can be located to help an analyst to reach a decision using the underlying DT.
+
+As we noted in the paper, the additive IBF is equivalent to previous efforts to induce oblique partitions, with a key simplification: the assumption that the function is non-parametric. Obviously, parameterizing an IBF could increase its flexibility, however at a higher computational cost. Whether this higher computational cost exceeds that of, say, the CART-LC method, is an open question. A research challenge would be to parameterize other IBFs for increasingly flexible non-linear partitions. Finally, a limitation of the development presented in this paper is that it only applies to quantitatie features, and therefore it would be interesting to explore possible extensions for qualitative features. This is also a matter for future research.
+
+Acknowledgments
+==========
+
+F.A. Lopez, M. Ruiz and M. Camacho acknowledge the financial support from projects ECO2015-65758-P, ECO2015-65637-P, and ECO2016-76178-P respectively. This study is the result of the activity carried out under the program Groups of Excellence of the Region of Murcia, the Fundacion Seneca, Science and Technology Agency of the region of Murcia project 19884/GERM/15. The following R packages were used during this research, and the authors wish to acknowledge their developers: `tidyverse` [@Wickham2017], `plyr` [@Wickham2011], `readxl` [@Wickham2018], `ggthemes` [@Arnold2018], `tree` [@Ripley2018], `evtree` [@Grubinger2014], `rpart` [@Therneau2017], `rpart.plot` [@Milborrow2018], `ggmap` [@Khale2013], `readr` [@Wickham2017readr], `rgdal` [@Bivand2018], `knitr` [@Xie2015; @Xie2018], `kableExtra` [@Zhu2018], `mlbench` [@Newman1998], `dprep` [@Acuna2015], `rattle.data` [@Williams2011], `microbenchmark` [@Mersmann2018], `RColorBrewer` [@Neuwirth2014], `scales` [@Wickham2018scales], and `gridExtra` [@Auguie2017].
+
+References {#references .unnumbered}
+==========

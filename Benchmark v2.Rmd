@@ -1,0 +1,754 @@
+---
+title: "Benchmarking Experiments - Extended"
+author: "Antonio Paez"
+date: "September 6, 2018"
+output: html_document
+---
+
+In this document, an extended set of benchmarking experiments are conducted. The datasets used are a subset of those used in the paper by Fernandez-Delgado "Do we Need Hundreds of Classifiers to Solve Real World Classification Problems?"
+
+# Initialize
+
+Begin by clearing the environment and loading libraries.
+```{r Initialize, echo = FALSE, warning = FALSE, message = FALSE}
+#Clean environment
+rm(list = ls())
+
+#Load packages used for analysis
+library(stringr)
+library(tidyverse)
+library(doParallel)
+library(tree)
+library(irr)
+library(evtree)
+library(ggmap)
+library(readr)
+library(rgdal)
+library(knitr)
+library(kableExtra)
+library(mlbench)
+library(randomForest)
+library(ggthemes)
+library(Zelig)
+```
+
+Obtain the names of directories in /data:
+```{r directory-names}
+dir.names <- list.dirs("./data", recursive = FALSE)
+```
+
+Read the names of data files and read data files in turn:
+```{r read-data}
+file.names <- character()
+data.sets <- list()
+for (i in 1:length(dir.names)){
+  files <- list.files(dir.names[i])
+  files <- files[str_detect(files, "_R.dat")]
+  if (!str_detect(files, "test_R.dat")){
+    file.names[i] <- files
+    } else {
+      file.names[i] <- files[-str_detect(files, "test_R.dat")]
+    }
+}
+```
+
+Edit list of datasets to use:
+```{r}
+#n: number of observations, k: number of variables, f: number of classes of factor
+dataset.stats <- data.frame(nm = character(), n = numeric(), k = numeric(), f = numeric())
+for (i in 1:length(dir.names)){
+  #select dataset
+  df <- read.delim(paste(dir.names[i], "/", file.names[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  dataset.stats <- rbind(dataset.stats,
+                         data.frame(nm = paste(dir.names[i], "/", file.names[i], sep = ""), 
+                                    n = nrow(df), 
+                                    k = ncol(df) - 1, 
+                                    f = nlevels(df$clase)))
+}
+
+dir.names.ev <- dir.names[-c(4, 18, 20, 46, 47, 48, 50, 52, 60, 79, 86, 94)]
+file.names.ev <- file.names[-c(4, 18, 20, 46, 47, 48, 50, 52, 60, 79, 86, 94)]
+```
+
+Create a function to compute the interactions:
+```{r}
+basis_functions <- function(df){
+  df0 <- df
+  a <- sapply(df0, is.numeric)
+  df0 <- df0[,a]
+  nc <- ncol(df0)
+  for ( i in 1:nc ) { 
+    for (j in i:nc) {
+      if (i != j){
+        df[[paste0(names(df0[i]),"p",names(df0[j]))]] <- df0[,i] + df0[,j]
+        df[[paste0(names(df0[i]),"x",names(df0[j]))]] <- df0[,i] * df0[,j]
+        df[[paste0(names(df0[i]),"c",names(df0[j]))]] <- df0[,i]^2 * df0[,j]^2
+        df[[paste0(names(df0[i]),"xexp",names(df0[j]))]] <- df0[,i] * exp(df0[,j])
+      }
+    }
+  }
+  rm(df0)
+  return(df)
+}
+```
+
+Create a function to store multiple results when doing parallel calculations with `foreach`:
+```{r}
+multiResultClass <- function(result1=NULL, result2=NULL, result3=NULL, result4=NULL, result5=NULL)
+{
+  me <- list(
+    result1 = result1,
+    result2 = result2,
+    result3 = result3,
+    result3 = result4,
+    result3 = result5
+  )
+
+  ## Set the name for the class
+  class(me) <- append(class(me),"multiResultClass")
+  return(me)
+}
+```
+
+As discussed in the paper, centering and scaling of the data is important. The datasets here were already centered to have a mean of zero and scaled to a standard deviation of one by Fernandez-Delgado et al. (p. 3139).
+
+## Select number of folds for k-fold cross-validation
+```{r number-folds, echo = FALSE}
+#Select number of folds for cross-validation
+n_folds <- 4
+```
+
+## Initialize number of datasets
+```{r}
+n_datasets <- length(dir.names.ev)
+```
+
+# Tree
+
+## Initialize dataframe for results
+```{r initialize-dataframe-results-tree}
+class.results.tree <- data.frame(dataset = numeric(),
+                            method = character(),
+                            bf = character(), 
+                            train_class = numeric(), 
+                            test_class = numeric(), 
+                            tree_size = numeric())
+```
+
+## Conventional tree with orthogonal partititions
+```{r tree-cross-validation-orthogonal, cache = TRUE}
+registerDoParallel(cores = 4)
+
+for (i in 1:n_datasets){
+  #select dataset
+  df <- read.delim(paste(dir.names.ev[i], "/", file.names.ev[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  oper <- foreach(k = icount(n_folds), .packages='tree') %dopar% {
+    result <- multiResultClass()
+    a1 <- read.delim(paste(dir.names.ev[i], "/conxuntos_kfold.dat", sep = ""), 
+                     header = FALSE, skip = 2 * k - 1, nrows = 1, stringsAsFactors = FALSE)
+    a2 <- strsplit(a1$V1," ")
+    a3 <- unlist(a2)
+    test_i <- as.numeric(a3) + 1
+    train_df <- df[-test_i, ]
+    test_df <- df[test_i, ]
+    junk <- tree(clase ~., data = train_df) #train
+    pred.junk.test <- predict(junk,newdata=test_df, type = "class") #predict using train dataset
+    pred.junk.train <- predict(junk,newdata=train_df, type = "class") #predict using test dataset
+    result$result1 <- sum(pred.junk.test==test_df$clase)/length(pred.junk.test)*100 #accuracy in training dataset: test_class
+    result$result2 <- sum(pred.junk.train==train_df$clase)/length(pred.junk.train)*100 #accuracy in testing dataset
+    result$result3 <- sum(junk$frame$var=="<leaf>") #tree size: tree_size
+    result$result4 <- pred.junk.test
+    result$result5 <- pred.junk.train
+    return(result)
+  }
+  test_class <- c(oper[[1]]$result1, oper[[2]]$result1, oper[[2]]$result1, oper[[4]]$result1)
+  train_class <- c(oper[[1]]$result2, oper[[2]]$result2, oper[[2]]$result2, oper[[4]]$result2)
+  tree_size <- c(oper[[1]]$result3, oper[[2]]$result3, oper[[2]]$result3, oper[[4]]$result3)
+  kappa_test <- kappam.fleiss(cbind(oper[[1]]$result4, oper[[2]]$result4, oper[[2]]$result4, oper[[4]]$result4))
+  kappa_train <- kappam.fleiss(cbind(oper[[1]]$result5, oper[[2]]$result5, oper[[2]]$result5, oper[[4]]$result5))
+  class.results.tree <- rbind(class.results.tree,
+                         data.frame(dataset = i,
+                                    method = "Tree",
+                                    bf = "Orthogonal",
+                                    train_class = train_class, test_class = test_class, tree_size = tree_size,
+                                    kappa_train$value, kappa_test$value)
+  )
+  print(i)
+}
+```
+
+### Time benchmark
+```{r time-benchmark-orthogonal, cache = TRUE, echo = FALSE}
+# mbm <- data.frame(expr = character(),
+#                   time = numeric(),
+#                   bf = character())
+# for (i in 1:length(dir.names)){
+#   #select dataset
+#   df <- read.delim(paste(dir.names[i], "/", file.names[i], sep = ""))
+#   df$clase <- factor(df$clase + 1)
+#   df$X <- NULL
+#   #benchmark computer time
+#   mbm.junk = microbenchmark(
+#     Tree = tree(clase ~., data = df),
+#     times = 50
+#     )
+#   mbm.junk$dataset <- i
+#   mbm.junk$bf <- "Orthogonal"
+#   mbm <- rbind(mbm, mbm.junk)
+#   print(i)
+# }
+```
+
+## Conventional tree with basis functions
+```{r tree-cross-validation-basis, echo = FALSE, echo = FALSE}
+registerDoParallel(cores = 4)
+
+for (i in 1:n_datasets){
+  #select dataset
+  df <- read.delim(paste(dir.names.ev[i], "/", file.names.ev[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  df <- basis_functions(df)
+  oper <- foreach(k = icount(n_folds), .packages='tree') %dopar% {
+    result <- multiResultClass()
+    a1 <- read.delim(paste(dir.names.ev[i], "/conxuntos_kfold.dat", sep = ""), 
+                     header = FALSE, skip = 2 * k - 1, nrows = 1, stringsAsFactors = FALSE)
+    a2 <- strsplit(a1$V1," ")
+    a3 <- unlist(a2)
+    test_i <- as.numeric(a3) + 1
+    train_df <- df[-test_i, ]
+    test_df <- df[test_i, ]
+    junk <- tree(clase ~., data = train_df) #train
+    pred.junk.test <- predict(junk,newdata=test_df, type = "class") #predict using train dataset
+    pred.junk.train <- predict(junk,newdata=train_df, type = "class") #predict using test dataset
+    result$result1 <- sum(pred.junk.test==test_df$clase)/length(pred.junk.test)*100 #accuracy in training dataset: test_class
+    result$result2 <- sum(pred.junk.train==train_df$clase)/length(pred.junk.train)*100 #accuracy in testing dataset
+    result$result3 <- sum(junk$frame$var=="<leaf>") #tree size: tree_size
+    result$result4 <- pred.junk.test
+    result$result5 <- pred.junk.train
+    return(result)
+  }
+  test_class <- c(oper[[1]]$result1, oper[[2]]$result1, oper[[2]]$result1, oper[[4]]$result1)
+  train_class <- c(oper[[1]]$result2, oper[[2]]$result2, oper[[2]]$result2, oper[[4]]$result2)
+  tree_size <- c(oper[[1]]$result3, oper[[2]]$result3, oper[[2]]$result3, oper[[4]]$result3)
+  kappa_test <- kappam.fleiss(cbind(oper[[1]]$result4, oper[[2]]$result4, oper[[2]]$result4, oper[[4]]$result4))
+  kappa_train <- kappam.fleiss(cbind(oper[[1]]$result5, oper[[2]]$result5, oper[[2]]$result5, oper[[4]]$result5))
+  class.results.tree <- rbind(class.results.tree,
+                         data.frame(dataset = i,
+                                    method = "Tree",
+                                    bf = "IBF",
+                                    train_class = train_class, test_class = test_class, tree_size = tree_size,
+                                    kappa_train$value, kappa_test$value)
+  )
+  print(i)
+}
+```
+
+```{r}
+save(dir.names.ev, file.names.ev, class.results.tree, file = "Results_Tree_v2.RData")
+```
+
+# Random forest
+
+## Initialize dataframe for results
+```{r initialize-dataframe-results-forest}
+class.results.forest <- data.frame(dataset = numeric(),
+                            method = character(),
+                            bf = character(), 
+                            train_class = numeric(), 
+                            test_class = numeric(), 
+                            tree_size = numeric())
+```
+
+##Random forest with orthogonal partititions
+```{r forest-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+registerDoParallel(cores = 4)
+
+for (i in 1:n_datasets){
+  #select dataset
+  df <- read.delim(paste(dir.names.ev[i], "/", file.names.ev[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  oper <- foreach(k = icount(n_folds), .packages='randomForest') %dopar% {
+    result <- multiResultClass()
+    a1 <- read.delim(paste(dir.names.ev[i], "/conxuntos_kfold.dat", sep = ""), 
+                     header = FALSE, skip = 2 * k - 1, nrows = 1, stringsAsFactors = FALSE)
+    a2 <- strsplit(a1$V1," ")
+    a3 <- unlist(a2)
+    test_i <- as.numeric(a3) + 1
+    train_df <- df[-test_i, ]
+    test_df <- df[test_i, ]
+    junk <- randomForest(clase ~., data = train_df) #train
+    pred.junk.test <- predict(junk,newdata=test_df, type = "response") #predict using train dataset
+    pred.junk.train <- predict(junk,newdata=train_df, type = "response") #predict using test dataset
+    result$result1 <- sum(pred.junk.test==test_df$clase)/length(pred.junk.test)*100 #accuracy in training dataset: test_class
+    result$result2 <- sum(pred.junk.train==train_df$clase)/length(pred.junk.train)*100 #accuracy in testing dataset
+    result$result3 <- sum(junk$frame$var=="<leaf>") #tree size: tree_size
+    result$result4 <- pred.junk.test
+    result$result5 <- pred.junk.train
+    return(result)
+  }
+  test_class <- c(oper[[1]]$result1, oper[[2]]$result1, oper[[2]]$result1, oper[[4]]$result1)
+  train_class <- c(oper[[1]]$result2, oper[[2]]$result2, oper[[2]]$result2, oper[[4]]$result2)
+  tree_size <- c(oper[[1]]$result3, oper[[2]]$result3, oper[[2]]$result3, oper[[4]]$result3)
+  kappa_test <- kappam.fleiss(cbind(oper[[1]]$result4, oper[[2]]$result4, oper[[2]]$result4, oper[[4]]$result4))
+  kappa_train <- kappam.fleiss(cbind(oper[[1]]$result5, oper[[2]]$result5, oper[[2]]$result5, oper[[4]]$result5))
+  class.results.forest <- rbind(class.results.forest,
+                         data.frame(dataset = i,
+                                    method = "Forest",
+                                    bf = "Orthogonal",
+                                    train_class = train_class, test_class = test_class, tree_size = tree_size,
+                                    kappa_train$value, kappa_test$value)
+  )
+  print(i)
+}
+```
+
+## Random forest with basis functions
+```{r forest-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+registerDoParallel(cores = 4)
+
+for (i in 43:n_datasets){
+  #select dataset
+  df <- read.delim(paste(dir.names.ev[i], "/", file.names.ev[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  df <- basis_functions(df)
+  oper <- foreach(k = icount(n_folds), .packages='randomForest') %dopar% {
+    result <- multiResultClass()
+    a1 <- read.delim(paste(dir.names.ev[i], "/conxuntos_kfold.dat", sep = ""), 
+                     header = FALSE, skip = 2 * k - 1, nrows = 1, stringsAsFactors = FALSE)
+    a2 <- strsplit(a1$V1," ")
+    a3 <- unlist(a2)
+    test_i <- as.numeric(a3) + 1
+    train_df <- df[-test_i, ]
+    test_df <- df[test_i, ]
+    junk <- randomForest(clase ~., data = train_df) #train
+    pred.junk.test <- predict(junk,newdata=test_df, type = "response") #predict using train dataset
+    pred.junk.train <- predict(junk,newdata=train_df, type = "response") #predict using test dataset
+    result$result1 <- sum(pred.junk.test==test_df$clase)/length(pred.junk.test)*100 #accuracy in training dataset: test_class
+    result$result2 <- sum(pred.junk.train==train_df$clase)/length(pred.junk.train)*100 #accuracy in testing dataset
+    result$result3 <- sum(junk$frame$var=="<leaf>") #tree size: tree_size
+    result$result4 <- pred.junk.test
+    result$result5 <- pred.junk.train
+    return(result)
+  }
+  test_class <- c(oper[[1]]$result1, oper[[2]]$result1, oper[[2]]$result1, oper[[4]]$result1)
+  train_class <- c(oper[[1]]$result2, oper[[2]]$result2, oper[[2]]$result2, oper[[4]]$result2)
+  tree_size <- c(oper[[1]]$result3, oper[[2]]$result3, oper[[2]]$result3, oper[[4]]$result3)
+  kappa_test <- kappam.fleiss(cbind(oper[[1]]$result4, oper[[2]]$result4, oper[[2]]$result4, oper[[4]]$result4))
+  kappa_train <- kappam.fleiss(cbind(oper[[1]]$result5, oper[[2]]$result5, oper[[2]]$result5, oper[[4]]$result5))
+  class.results.forest <- rbind(class.results.forest,
+                         data.frame(dataset = i,
+                                    method = "Forest",
+                                    bf = "IBF",
+                                    train_class = train_class, test_class = test_class, tree_size = tree_size,
+                                    kappa_train$value, kappa_test$value)
+  )
+  print(i)
+}
+```
+
+```{r}
+save(dir.names.ev, file.names.ev, class.results.forest, file = "Results_Forest_v2.RData")
+```
+
+# Evolutionary tree
+
+## Initialize dataframe for results
+```{r initialize-dataframe-results-ev}
+class.results.ev <- data.frame(dataset = numeric(),
+                            method = character(),
+                            bf = character(), 
+                            train_class = numeric(), 
+                            test_class = numeric(), 
+                            tree_size = numeric())
+```
+
+## Evolutionary tree with orthogonal partititions
+```{r ev-cross-validation-orthogonal, echo = FALSE, echo = FALSE, cache = TRUE}
+registerDoParallel(cores = 4)
+
+for (i in 1:n_datasets){
+  #select dataset
+  df <- read.delim(paste(dir.names.ev[i], "/", file.names.ev[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  oper <- foreach(k = icount(n_folds), .packages='evtree') %dopar% {
+    result <- multiResultClass()
+    a1 <- read.delim(paste(dir.names.ev[i], "/conxuntos_kfold.dat", sep = ""), 
+                     header = FALSE, skip = 2 * k - 1, nrows = 1, stringsAsFactors = FALSE)
+    a2 <- strsplit(a1$V1," ")
+    a3 <- unlist(a2)
+    test_i <- as.numeric(a3) + 1
+    train_df <- df[-test_i, ]
+    test_df <- df[test_i, ]
+    junk <- evtree(clase ~., data = train_df) #train
+    pred.junk.test <- predict(junk,newdata=test_df) #predict using train dataset
+    #result$result1 <- sum(pred.junk.test==test_df$clase)/length(pred.junk.test)*100 #accuracy in training dataset: test_class
+    pred.junk.train <- predict(junk,newdata=train_df) #predict using test dataset
+    #result$result2 <- sum(pred.junk.train==train_df$clase)/length(pred.junk.train[,k])*100 #accuracy in testing dataset
+    #result$result3 <- width(junk) #tree size: tree_size
+    result$result1 <- sum(pred.junk.test==test_df$clase)/length(pred.junk.test)*100 #accuracy in training dataset: test_class
+    result$result2 <- sum(pred.junk.train==train_df$clase)/length(pred.junk.train)*100 #accuracy in testing dataset
+    result$result3 <- width(junk) #tree size: tree_size
+    result$result4 <- pred.junk.test
+    result$result5 <- pred.junk.train
+    return(result)
+  }
+  test_class <- c(oper[[1]]$result1, oper[[2]]$result1, oper[[2]]$result1, oper[[4]]$result1)
+  train_class <- c(oper[[1]]$result2, oper[[2]]$result2, oper[[2]]$result2, oper[[4]]$result2)
+  tree_size <- c(oper[[1]]$result3, oper[[2]]$result3, oper[[2]]$result3, oper[[4]]$result3)
+  kappa_test <- kappam.fleiss(cbind(oper[[1]]$result4, oper[[2]]$result4, oper[[2]]$result4, oper[[4]]$result4))
+  kappa_train <- kappam.fleiss(cbind(oper[[1]]$result5, oper[[2]]$result5, oper[[2]]$result5, oper[[4]]$result5))
+  class.results.ev <- rbind(class.results.ev,
+                         data.frame(dataset = i,
+                                    method = "Evolutionary Tree",
+                                    bf = "Orthogonal",
+                                    train_class = train_class, test_class = test_class, tree_size = tree_size,
+                                    kappa_train$value, kappa_test$value)
+  )
+  print(i)
+}
+```
+
+### Evolutionary tree with basis functions
+```{r ev-cross-validation-basis, echo = FALSE, echo = FALSE, cache = TRUE}
+registerDoParallel(cores = 4)
+
+for (i in 1:n_datasets){
+  #select dataset
+  df <- read.delim(paste(dir.names.ev[i], "/", file.names.ev[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  df <- basis_functions(df)
+  oper <- foreach(k = icount(n_folds), .packages='evtree') %dopar% {
+    result <- multiResultClass()
+    a1 <- read.delim(paste(dir.names.ev[i], "/conxuntos_kfold.dat", sep = ""), 
+                     header = FALSE, skip = 2 * k - 1, nrows = 1, stringsAsFactors = FALSE)
+    a2 <- strsplit(a1$V1," ")
+    a3 <- unlist(a2)
+    test_i <- as.numeric(a3) + 1
+    train_df <- df[-test_i, ]
+    test_df <- df[test_i, ]
+    junk <- evtree(clase ~., data = train_df) #train
+    pred.junk.test <- predict(junk,newdata=test_df) #predict using train dataset
+    #result$result1 <- sum(pred.junk.test==test_df$clase)/length(pred.junk.test)*100 #accuracy in training dataset: test_class
+    pred.junk.train <- predict(junk,newdata=train_df) #predict using test dataset
+    #result$result2 <- sum(pred.junk.train==train_df$clase)/length(pred.junk.train[,k])*100 #accuracy in testing dataset
+    #result$result3 <- width(junk) #tree size: tree_size
+    result$result1 <- sum(pred.junk.test==test_df$clase)/length(pred.junk.test)*100 #accuracy in training dataset: test_class
+    result$result2 <- sum(pred.junk.train==train_df$clase)/length(pred.junk.train)*100 #accuracy in testing dataset
+    result$result3 <- width(junk) #tree size: tree_size
+    result$result4 <- pred.junk.test
+    result$result5 <- pred.junk.train
+    return(result)
+  }
+  test_class <- c(oper[[1]]$result1, oper[[2]]$result1, oper[[2]]$result1, oper[[4]]$result1)
+  train_class <- c(oper[[1]]$result2, oper[[2]]$result2, oper[[2]]$result2, oper[[4]]$result2)
+  tree_size <- c(oper[[1]]$result3, oper[[2]]$result3, oper[[2]]$result3, oper[[4]]$result3)
+  kappa_test <- kappam.fleiss(cbind(oper[[1]]$result4, oper[[2]]$result4, oper[[2]]$result4, oper[[4]]$result4))
+  kappa_train <- kappam.fleiss(cbind(oper[[1]]$result5, oper[[2]]$result5, oper[[2]]$result5, oper[[4]]$result5))
+  class.results.ev <- rbind(class.results.ev,
+                         data.frame(dataset = i,
+                                    method = "Evolutionary Tree",
+                                    bf = "IBF",
+                                    train_class = train_class, test_class = test_class, tree_size = tree_size,
+                                    kappa_train$value, kappa_test$value)
+  )
+  print(i)
+}
+```
+
+```{r}
+save(dir.names.ev, file.names.ev, class.results.tree, file = "Results_EvolutionaryTree_v2.RData")
+```
+
+# Results and plots
+
+Load results:
+```{r load-results}
+load("Results_Tree_v2.RData")
+load("Results_Forest_v2.RData")
+load("Results_EvolutionaryTree_v2.RData")
+```
+
+Join dataframes:
+```{r join-results}
+class.results <- rbind(class.results.tree, class.results.forest, class.results.ev)
+```
+
+Summarize by classifier:
+```{r}
+group_by(class.results, method, bf) %>% 
+  dplyr::summarise(mean_train_acc = mean(train_class), mean_test_acc = mean(test_class),
+            mean_tree_size = mean(tree_size),
+            mean_kappa_train = mean(kappa_train.value), mean_kappa_test = mean(kappa_test.value))
+```
+
+Notice the NaNs. Recalculate while excluding NaNs:
+```{r}
+group_by(class.results, method, bf) %>% 
+  dplyr::summarise(mean_train_acc = mean(train_class), mean_test_acc = mean(test_class),
+            mean_tree_size = mean(tree_size),
+            mean_kappa_train = mean(kappa_train.value, na.rm = TRUE), mean_kappa_test = mean(kappa_test.value, na.rm = TRUE))
+```
+
+## All datasets
+
+```{r data-accuracy-test}
+#Wrangle data for plotting accuracy
+
+#Group by dataset, method, and basis function, then calculate the mean accuracy and standard deviation by group
+junk <- group_by(class.results, dataset, method, bf) %>% dplyr::summarize(mean_acc_test = mean(test_class), se_acc_test = sd(test_class))
+
+#Calculate the mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(mean_acc_dataset = mean(mean_acc_test))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2) %>% arrange(mean_acc_dataset)
+
+#Add a variable that ranks the datasets by mean accuracy
+junk$rank_order <- rep(c(1:93), each = 6)
+```
+
+```{r}
+#Plot point ranges
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test, ymin = mean_acc_test - se_acc_test, ymax = mean_acc_test + se_acc_test, color = method)) +
+  geom_pointrange() +
+  ylab("Accuracy (%)") +
+  theme_minimal()
+```
+  
+## Tree
+
+```{r data-accuracy-tree-test}
+#Wrangle data for plotting accuracy
+
+#Group by dataset, method, and basis function, then calculate the mean accuracy and standard deviation by group
+junk <- group_by(class.results.tree, dataset, method, bf) %>% summarize(mean_acc_test = mean(test_class), se_acc_test = sd(test_class))
+
+junk$mult <- rep(c(-1, 1), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% summarize(diff_mean_acc_dataset = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2) %>% arrange(diff_mean_acc_dataset)
+
+#Add a variable that ranks the datasets by mean accuracy
+junk$rank_order <- rep(c(1:93), each = 2)
+
+#Dummy for mean accuracy of orthogonal 
+junk$mult <- rep(c(1, 0), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% summarize(mean_acc_tree = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2)
+
+```
+
+```{r}
+#Plot point ranges using orthogonal as a baseline
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test - mean_acc_tree, ymin = mean_acc_test - mean_acc_tree - se_acc_test, ymax = mean_acc_test - mean_acc_tree + se_acc_test, color = bf, shape = bf)) +
+  geom_pointrange() +
+  ylab("Accuracy Loss/Gain (IBF vs Orthogonal)") +
+  xlab("Rank (from max loss to max gain)") +
+  theme_minimal()
+```
+  
+```{r}
+#Plot ribbons
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test, ymin = mean_acc_test - se_acc_test, ymax = mean_acc_test + se_acc_test, color = bf)) +
+  geom_smooth(stat = "identity") +
+  ylab("Accuracy (%)")
+```
+
+```{r}
+#Plot ribbons
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test, color = bf)) +
+  geom_smooth() +
+  ylab("Accuracy (%)")
+```
+
+```{r size-tree}
+#Wrangle data for plotting accuracy
+
+#Group by dataset, method, and basis function, then calculate the mean tree size and standard deviation by group
+junk <- group_by(class.results.tree, dataset, method, bf) %>% summarize(mean_size = mean(tree_size), se_size = sd(tree_size), mean_acc_test = mean(test_class))
+
+junk$mult <- rep(c(1, -1), 107)
+
+#Calculate the mean accuracy by dataset
+#junk2 <- group_by(junk, dataset) %>% summarize(mean_size_dataset = mean(mean_size))
+
+#Join the two dataframes
+#junk <- left_join(junk, junk2) %>% arrange(mean_size_dataset)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% summarize(diff_mean_acc_dataset = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2) %>% arrange(diff_mean_acc_dataset)
+
+#Add a variable that ranks the datasets by mean accuracy
+junk$rank_order <- rep(c(1:107), each = 2)
+```
+
+```{r}
+#Plot ribbons
+ggplot(data = junk, aes(x = rank_order, y = mean_size, ymin = mean_size - se_size, ymax = mean_size + se_size, color = bf)) +
+  geom_smooth(stat = "identity") +
+  ylab("Tree Size (Terminal Nodes)")
+```
+
+## Forest
+
+```{r data-accuracy-forest-test}
+#Wrangle data for plotting accuracy
+
+#Group by dataset, method, and basis function, then calculate the mean accuracy and standard deviation by group
+junk <- group_by(class.results.forest, dataset, method, bf) %>% dplyr::summarize(mean_acc_test = mean(test_class), se_acc_test = sd(test_class))
+
+junk$mult <- rep(c(-1, 1), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(diff_mean_acc_dataset = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2) %>% arrange(diff_mean_acc_dataset)
+
+#Add a variable that ranks the datasets by mean accuracy
+junk$rank_order <- rep(c(1:93), each = 2)
+
+#Dummy for mean accuracy of orthogonal 
+junk$mult <- rep(c(1, 0), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(mean_acc_tree = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2)
+
+```
+
+```{r}
+#Plot point ranges using orthogonal as a baseline
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test - mean_acc_tree, ymin = mean_acc_test - mean_acc_tree - se_acc_test, ymax = mean_acc_test - mean_acc_tree + se_acc_test, color = bf, shape = bf)) +
+  geom_pointrange() +
+  ylab("Accuracy Loss/Gain (IBF vs Orthogonal)") +
+  xlab("Rank (from max loss to max gain)") +
+  theme_minimal()
+```
+  
+## Evolutionary tree
+
+```{r data-accuracy-ev-test}
+#Wrangle data for plotting accuracy
+
+#Group by dataset, method, and basis function, then calculate the mean accuracy and standard deviation by group
+junk <- group_by(class.results.ev, dataset, method, bf) %>% dplyr::summarize(mean_acc_test = mean(test_class), se_acc_test = sd(test_class))
+
+junk$mult <- rep(c(-1, 1), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(diff_mean_acc_dataset = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2) %>% arrange(diff_mean_acc_dataset)
+
+#Add a variable that ranks the datasets by mean accuracy
+junk$rank_order <- rep(c(1:93), each = 2)
+
+#Dummy for mean accuracy of orthogonal 
+junk$mult <- rep(c(1, 0), 93)
+
+#Calculate the difference in mean accuracy by dataset
+junk2 <- group_by(junk, dataset) %>% dplyr::summarize(mean_acc_tree = sum(mean_acc_test * mult))
+
+#Join the two dataframes
+junk <- left_join(junk, junk2)
+
+```
+
+```{r}
+#Plot point ranges using orthogonal as a baseline
+ggplot(data = junk, aes(x = rank_order, y = mean_acc_test - mean_acc_tree, ymin = mean_acc_test - mean_acc_tree - se_acc_test, ymax = mean_acc_test - mean_acc_tree + se_acc_test, color = bf, shape = bf)) +
+  geom_pointrange() +
+  ylab("Accuracy Loss/Gain (IBF vs Orthogonal)") +
+  xlab("Rank (from max loss to max gain)") +
+  theme_minimal()
+```
+  
+
+# Model testing accuracy
+
+Summarize datasets:
+```{r}
+#n: number of observations, k: number of variables, f: number of classes of factor, m = proportion majority class
+dataset.stats <- data.frame(nm = character(), n = numeric(), k = numeric(), f = numeric())
+for (i in 1:length(dir.names.ev)){
+  #select dataset
+  df <- read.delim(paste(dir.names[i], "/", file.names[i], sep = ""))
+  df$clase <- factor(df$clase + 1)
+  df$X <- NULL
+  dataset.stats <- rbind(dataset.stats,
+                         data.frame(dataset = i,
+                                    nm = paste(dir.names[i], "/", file.names[i], sep = ""), 
+                                    n = nrow(df), 
+                                    k = ncol(df) - 1, 
+                                    f = nlevels(df$clase),
+                                    m = max(table(df$clase))/nrow(df))
+                         )
+}
+```
+
+Join with results:
+```{r}
+class.results <- left_join(class.results, dataset.stats)
+```
+
+Convert to proportions:
+```{r}
+class.results <- mutate(class.results, test_class.success = round(test_class/100 * n), test_class.fail = n - test_class.success)
+```
+
+
+Estimate model:
+```{r}
+model_1 <- glm(formula = cbind(test_class.success, test_class.fail) ~ n + k + m + method + bf, binomial, data = class.results)
+```
+
+```{r}
+exp(cbind(OR = coef(model_1), confint(model_1)))
+```
+
+
+
+Estimate model:
+```{r}
+model_acc <- glm(formula = cbind(test_class.success, test_class.fail) ~ n + k + m + method + bf + n:method + k:method + m:method + n:bf + k:bf + m:bf,
+               binomial, data = class.results)
+```
+
+```{r}
+exp(cbind(OR = coef(model_acc), confint(model_acc)))
+```
+
+# Model tree size
+
+Estimate model:
+```{r}
+model_tree <- lm(formula = tree_size ~ n + k + m + method + bf + n:method + k:method + m:method + n:bf + k:bf + m:bf, 
+              data = class.results[class.results$method != "Forest",])
+```
+
+```{r}
+summary(model_tree)
+```
