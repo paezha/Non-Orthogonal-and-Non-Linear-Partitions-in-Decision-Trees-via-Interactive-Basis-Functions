@@ -1,18 +1,18 @@
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{fig1-example.pdf}
 \caption{\label{fig:fig1-example}Prototypical Decision Tree}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig2-chessboard-1.pdf}
 \caption{\label{fig:fig2-chessboard}Chessboard example}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig3-simple-basis-1.pdf}
 \caption{\label{fig:fig3-simple-basis}Example of a basis function used
@@ -20,7 +20,7 @@ as a feature to train a Decision Tree}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig4-additive-basis-1.pdf}
 \caption{\label{fig:fig4-additive-basis}Oblique basis function and
@@ -28,7 +28,7 @@ projections with different splitting points (s)}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig5-hyperbolic-basis-1.pdf}
 \caption{\label{fig:fig5-hyperbolic-basis}Hyperbolic basis function and
@@ -36,7 +36,7 @@ projections with different splitting points (s)}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig6-radial-basis-1.pdf}
 \caption{\label{fig:fig6-radial-basis}Radial IBF and projections with
@@ -44,7 +44,7 @@ different splitting points (s)}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig7-curvature-1.pdf}
 \caption{\label{fig:fig7-curvature}Behavior of radial IBF with
@@ -53,7 +53,7 @@ variables (bottom panel)}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig8-performance-algorithm-results-1.pdf}
 \caption{\label{fig:fig8-performance-algorithm-results}Benchmarking
@@ -61,7 +61,7 @@ results: Classification accuracy by Algorithm}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig9-accuracy-tree-1.pdf}
 \caption{\label{fig:fig9-accuracy-tree}Accuracy comparison for method
@@ -69,7 +69,7 @@ tree: orthogonal and IBF implementations}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig10-accuracy-forest-1.pdf}
 \caption{\label{fig:fig10-accuracy-forest}Accuracy comparison for method
@@ -77,7 +77,7 @@ random forest: orthogonal and IBF implementations}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig11-accuracy-ev-1.pdf}
 \caption{\label{fig:fig11-accuracy-ev}Accuracy comparison for method
@@ -85,7 +85,7 @@ evolutionary tree: orthogonal and IBF implementations}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig12-estimated-accuracy-n-1.pdf}
 \caption{\label{fig:fig12-estimated-accuracy-n}Probability of correctly
@@ -93,7 +93,7 @@ predicting an observations as a function of number of observations (n)}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig13-estimated-accuracy-f-1.pdf}
 \caption{\label{fig:fig13-estimated-accuracy-f}Probability of correctly
@@ -101,7 +101,7 @@ predicting an observations as a function of number of features (f)}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig14-estimated-accuracy-k-1.pdf}
 \caption{\label{fig:fig14-estimated-accuracy-k}Probability of correctly
@@ -109,7 +109,7 @@ predicting an observations as a function of number of classes (k)}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig15-estimated-accuracy-m-1.pdf}
 \caption{\label{fig:fig15-estimated-accuracy-m}Probability of correctly
@@ -118,106 +118,106 @@ predicting an observations as a function of proportion majority class
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig11-map-newark-1.pdf}
-\caption{\label{fig:fig11-map-newark}Three ethnic groups in Newark (1880
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig16-map-newark-1.pdf}
+\caption{\label{fig:fig16-map-newark}Three ethnic groups in Newark (1880
 US Census)}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig12-tree-orthogonal-newark-1.pdf}
-\caption{\label{fig:fig12-tree-orthogonal-newark}Decisiton tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig17-tree-orthogonal-newark-1.pdf}
+\caption{\label{fig:fig17-tree-orthogonal-newark}Decision tree with
 orthogonal partitions for spatial classification, Newark ethnic groups}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig13-map-orthogonal-newark-1.pdf}
-\caption{\label{fig:fig13-map-orthogonal-newark}Ethnic neighborhoods in
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig18-map-orthogonal-newark-1.pdf}
+\caption{\label{fig:fig18-map-orthogonal-newark}Ethnic neighborhoods in
 Newark, 1880, using orthogonal partitions}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig14-tree-basis-newark-1.pdf}
-\caption{\label{fig:fig14-tree-basis-newark}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig19-tree-basis-newark-1.pdf}
+\caption{\label{fig:fig19-tree-basis-newark}Decision tree with
 non-orthogonal/non-linear partitions for spatial classification, Newark
 ethnic groups}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig15-map-basis-newark-1.pdf}
-\caption{\label{fig:fig15-map-basis-newark}Ethnic neighborhoods in
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig20-map-basis-newark-1.pdf}
+\caption{\label{fig:fig20-map-basis-newark}Ethnic neighborhoods in
 Newark, 1880, using non-orthogonal partitions}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig16-map-sapporo-1.pdf}
-\caption{\label{fig:fig16-map-sapporo}Land prices in Sapporo (log)}
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig21-map-sapporo-1.pdf}
+\caption{\label{fig:fig21-map-sapporo}Land prices in Sapporo (log)}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig17-tree-orthogonal-sapporo-1.pdf}
-\caption{\label{fig:fig17-tree-orthogonal-sapporo}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig22-tree-orthogonal-sapporo-1.pdf}
+\caption{\label{fig:fig22-tree-orthogonal-sapporo}Decision tree with
 orthogonal partitions for submarket identification, Sapporo land prices}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig18-map-orthogonal-sapporo-1.pdf}
-\caption{\label{fig:fig18-map-orthogonal-sapporo}Spatial land price
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig23-map-orthogonal-sapporo-1.pdf}
+\caption{\label{fig:fig23-map-orthogonal-sapporo}Spatial land price
 submarkets in Sapporo using orthogonal partitions}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig19-tree-basis-sapporo-1.pdf}
-\caption{\label{fig:fig19-tree-basis-sapporo}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig24-tree-basis-sapporo-1.pdf}
+\caption{\label{fig:fig24-tree-basis-sapporo}Decision tree with
 non-orthogonal/non-linear partitions for submarket identification,
 Sapporo land prices}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig20-map-basis-sapporo-1.pdf}
-\caption{\label{fig:fig20-map-basis-sapporo}IBF-based non-orthogonal
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig25-map-basis-sapporo-1.pdf}
+\caption{\label{fig:fig25-map-basis-sapporo}IBF-based non-orthogonal
 land price regions (log) in Sapporo}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig21-tree-orthogonal-election-1.pdf}
-\caption{\label{fig:fig21-tree-orthogonal-election}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig26-tree-orthogonal-election-1.pdf}
+\caption{\label{fig:fig26-tree-orthogonal-election}Decision tree with
 orthogonal partitions, Ontario voter turnout}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig22-tree-basis-election-1.pdf}
-\caption{\label{fig:fig22-tree-basis-election}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig27-tree-basis-election-1.pdf}
+\caption{\label{fig:fig27-tree-basis-election}Decision tree with
 non-orthogonal/non-linear partitions, Ontario voter turnout}
 \end{figure}
 \efloatseparator
  
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig23-election-decision-charts-1.pdf}
-\caption{\label{fig:fig23-election-decision-charts}Decision charts for
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig28-election-decision-charts-1.pdf}
+\caption{\label{fig:fig28-election-decision-charts}Decision charts for
 voter turnout}
 \end{figure}

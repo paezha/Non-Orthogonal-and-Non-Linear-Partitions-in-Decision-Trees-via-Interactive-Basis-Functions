@@ -64,10 +64,6 @@
 % Pandoc toggle for numbering sections (defaults to be off)
 \setcounter{secnumdepth}{0}
 % Pandoc header
-\usepackage{float}
-\usepackage[nomarkers,figuresonly]{endfloat}
-\floatplacement{figure}{H}
-\usepackage{booktabs}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
@@ -180,7 +176,9 @@ partitions at all. In this case, the performance of the algorithm tends
 to be mediocre. Accordingly, a number of proposals have aimed at
 ameliorating this situation by inducing oblique partitions (e.g.,
 Murthy, Kasif, and Salzberg 1994; Wickramarachchi et al. 2016; Cantu-Paz
-and Kamath 2003).
+and Kamath 2003) and oblique decision tree ensemble variants (e.g.,
+Menze et al. 2011; Zhang and Suganthan 2014; Zhang and Suganthan 2015;
+Zhang and Suganthan 2017; Zhang et al. 2017; Qiu et al. 2017).
 
 The objective of this paper is to introduce a novel strategy for
 non-orthogonal partition of variable space in the training of DTs. The
@@ -227,7 +225,7 @@ will serve to motivate subsequent sections of the paper.
 A decision tree is a regression/classification algorithm which models a
 response variable \(Y\) (which could be quantitative or qualitative)
 from a vector of \(p\) features, \(X=(X_{1},\dots,X_{p})\), where
-\(X\in \mathrm{R}^{p}\). The algorithm operates by recursively
+\(X\in \mathbb{R}^{p}\). The algorithm operates by recursively
 partitioning the space of the features into a set of \(M\) regions
 \(R_{m}\), \(m=1,...,M\).
 
@@ -275,10 +273,10 @@ subsamples below a minimum number of cases (e.g., less than five cases).
 Operating in this way, the recursive partitioning method produces
 partitions that are orthogonal to the \(p\) features, and thus results
 in a total of \(M\) \(p\)-dimensional rectangular prisms, or hyperboxes
-(see Figure 1 \ref{fig:fig1-example} for a prototypical decision tree
-with two features \(X_1\) and \(X_2\)).
+(see Figure \ref{fig:fig1-example} for a prototypical decision tree with
+two features \(X_1\) and \(X_2\)).
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{fig1-example.pdf}
 \caption{\label{fig:fig1-example}Prototypical Decision Tree}
@@ -295,10 +293,11 @@ are used. In this case an optimal split can be found at the first step,
 as illustrated by the candidate split shown with a dashed line in the
 figure.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig2-chessboard-1.pdf}
-\caption{\label{fig:fig2-chessboard}Chessboard example}
+\caption{\label{fig:fig2-chessboard}Chessboard example with variable Y
+with two classes}
 \end{figure}
 
 Motivated by the challenge posed by situations such as the one in Figure
@@ -306,7 +305,27 @@ Motivated by the challenge posed by situations such as the one in Figure
 non-orthogonal decision boundaries, previous research has seen the
 development of numerous methods to induce oblique decision boundaries
 for trees (see Cantu-Paz and Kamath 2003; and Wickramarachchi et al.
-2016 for an overview).
+2016 for an overview). More concretely Menze et al. (2011) propose the
+use of oblique random forests (oRF) which explicitly learn optimal split
+directions at internal nodes using linear discriminative models, rather
+than using random coefficients as the original oRF; Zhang and Suganthan
+(2014) propose a new method to increase the diversity of each tree in
+the forests and thereby improve the overall accuracy by building the
+Random Forests with two projection methods Principal Component Analysis
+and Linear Discriminate Analysis; Zhang and Suganthan (2015) propose a
+new method for oblique trees based on multisurface proximal support
+vector machine; Zhang et al. (2017) propose to use a more powerful
+proximal SVM to obtain oblique hyperplanes to capture the geometric
+structure in the context of visual tracking; Zhang and Suganthan (2017)
+propose an efficient co-trained kernel ridge regression method and a
+random vector functional link network ensemble that outperform the
+behavior of classical classifiers; Qiu et al. (2017) study the oblique
+random forest in the context of time series forecasting by using a least
+square classifier to perform partitions. Some others excellent reviews
+on ensemble learning are Dietterich (2000), Rokach (2010), and Ren et
+al. (2016) where the authors explain why ensembles can often perform
+better than any single classifier and reviews traditional as well as
+state-of-the-art ensemble methods.
 
 As discussed by Wickramarachchi et al. (2016), some algorithms used to
 induce oblique partitions identify candidate partition boundaries based
@@ -376,10 +395,10 @@ where \(X^{\ast }\in \mathbb{R}^{p+T}\), and
 Notably, the standard recursive partitioning mechanism of Decision Trees
 applied to any \(X_p\) in the augmented set \(T\) leads to partitions of
 \(\left(p+T\right)\)-dimensional prisms. Furthermore, the projections of
-these prisms in the subspace of \(\mathrm{R}^{p}\) defined by \(X\)
-still reproduce a linear orthogothal partition of this space. Consider
-an example with \(p=2\), that is \(X=\{X_1,X_2\}\). Moreover, \(T=1\)
-and \(K=1\) with \(b_1(x)=x^2\), so that
+these prisms in the subspace of \(\mathbb{R}^{p}\) defined by \(X\) are
+a consequence of a linear orthogothal partition on the original space.
+Consider an example with \(p=2\), that is \(X=\{X_1,X_2\}\). Moreover,
+\(T=1\) and \(K=1\) with \(b_1(x)=x^2\), so that
 \(X^\ast=\{X_1,X_2,X_3=X_1^2\}\). Whenever the partitioning mechanism
 selects a split \(s\) in \(X_3\) (say, \(s=2\), the solid line in Figure
 \ref{fig:fig3-simple-basis}), this split is projected in \(X\) as
@@ -388,11 +407,12 @@ the dimension of the basis function is equivalent to finding an
 orthogonal decision boundary on the original basis, in the present
 example at \(\sqrt 2\) in \(X_1\) (dashed line).
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig3-simple-basis-1.pdf}
 \caption{\label{fig:fig3-simple-basis}Example of a basis function used
-as a feature to train a Decision Tree}
+as a feature to train a Decision Tree to classify variable Y with two
+classes}
 \end{figure}
 
 Since basis functions still produce orthogonal partitions in the
@@ -423,7 +443,7 @@ that \(X_3=s\) is projected in the plane of the original basis as
 \(X_2=s-X_1\), thus providing an oblique partition on that plane as
 shown in Figure \ref{fig:fig4-additive-basis}.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig4-additive-basis-1.pdf}
 \caption{\label{fig:fig4-additive-basis}Oblique basis function and
@@ -441,7 +461,7 @@ multiplicative IBF fixes \(X_1X_2=s\), and therefore \(X_2=s/X_1\), thus
 creating a hyperbolic partition, as shown in Figure
 \ref{fig:fig5-hyperbolic-basis}.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig5-hyperbolic-basis-1.pdf}
 \caption{\label{fig:fig5-hyperbolic-basis}Hyperbolic basis function and
@@ -454,7 +474,7 @@ to \(X_1^2 + X_2^2\). A split \(s\) in the dimension of the IBF fixes
 \(X_1^2 + X_2^2=s\), and therefore \(X_2=\sqrt{s-X_1^2}\), thus creating
 a radial partition.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig6-radial-basis-1.pdf}
 \caption{\label{fig:fig6-radial-basis}Radial IBF and projections with
@@ -475,13 +495,12 @@ complexity of the search, the introduction of IBFs increases the
 complexity at each node of the tree (when using the conventional search
 algorithm) by \(O(n(p+D))\), where \(n\) is the number of cases, \(p\)
 is the number of features, and \(D\) is the number of IBFs under
-consideration. Compare to the exaustive search for oblique decision
-boundaries (\(O(2^p \times{n\choose{p}})\), in Murthy, Kasif, and
-Salzberg 1994), or an algorithm such as HHCART, which has complexity of
-\(O(Cp^2nlog(n))\) (where \(C\) is the number of classes in
-classification problems, Wickramarachchi et al. 2016). As can be
-appreciated, the increase in complexity with our approach is fairly
-modest.
+consideration. In contrast, the exhaustive search for oblique decision
+boundaries has complexity of \(O(2^p \times{n\choose{p}})\) according to
+Murthy et al. (1994), and \(O(Cp^2nlog(n))\) in HHCART (where \(C\) is
+the number of classes in classification problems, Wickramarachchi et al.
+2016). As can be appreciated, the increase in complexity with our
+approach is fairly modest.
 
 \section{4 Practical Considerations}\label{practical-considerations}
 
@@ -525,7 +544,7 @@ to analysis, in order to increase the chances that non-linear partitions
 are effective, and reduce the possibility that they resemble linear
 partitions locally.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig7-curvature-1.pdf}
 \caption{\label{fig:fig7-curvature}Behavior of radial IBF with
@@ -725,7 +744,7 @@ h_2(b_1(X_1)b_3(X_2))=b_1(X_1)b_3(X_2)=X_1e^{X_2}
 The size of the experiment is as follows: three different methods
 (tree/random forest/evolutionary tree), ninety three different datasets,
 two different types of partitions (orthogonal/IBFs), and four
-replications for each (i.e., 10-fold cross-validation). The summary of
+replications for each (i.e., 4-fold cross-validation). The summary of
 the results is shown in Table \ref{tab:summary-benchmarking}, where it
 can be seen that random forests outperform evolutionary trees, which in
 turn outperform conventional trees. This is as anticipated. Further, for
@@ -770,10 +789,10 @@ deviation of each algorithm for each dataset. It can be seen there that
 the lowest accuracy is around \(25\)\% and the highest is \(100\)\% in
 the test sample. In general terms, as hinted by the summary results,
 random forests perform better and tree worse, but this is not always the
-case. Moreover, there are notable differences between the use of
-orthogonal and IBF within each methods.
+case. Moreover, as will be shown next, there are notable differences
+between the use of orthogonal and IBF within each method.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig8-performance-algorithm-results-1.pdf}
 \caption{\label{fig:fig8-performance-algorithm-results}Benchmarking
@@ -789,7 +808,7 @@ the implementation with IBFs more often than not leads to accuracy
 gains, in fact in 53 out of 93 datasets. The maximum accuracy gain is
 26.61\% whereas the maximum loss is -14.77\%.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig9-accuracy-tree-1.pdf}
 \caption{\label{fig:fig9-accuracy-tree}Accuracy comparison for method
@@ -805,7 +824,7 @@ models with IBFs. As seen in the figure, the implementation with IBFs
 often leads to accuracy gains, in 44 out of 93 datasets. The maximum
 accuracy gain is 10.71\% whereas the maximum loss is -5.189\%.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig10-accuracy-forest-1.pdf}
 \caption{\label{fig:fig10-accuracy-forest}Accuracy comparison for method
@@ -820,7 +839,7 @@ models with IBFs. As seen in the figure, the implementation with IBFs
 also leads to accuracy gains, in this case in 42 out of 93 datasets. The
 maximum accuracy gain is 18.48\% whereas the maximum loss is -25\%.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig11-accuracy-ev-1.pdf}
 \caption{\label{fig:fig11-accuracy-ev}Accuracy comparison for method
@@ -941,12 +960,13 @@ accuracy when \(k\leq3\) but have significantly lower levels of accuracy
 when the dependent variables has more classes.
 
 Lastly, with respect to the proportion of the majority class \(m\), we
-can see that the probability tends to behave in a non-linear fashion,
-with accuracy being higher when one class has a majority but does not
-dominate. In this case, IBFs tend to perform significantly better than
-non-linear partitions. The superiority of IBFs is uniform for the
-algorithm tree, whereas for evolutionary tree and random forest,
-orthogonal partitions are significantly more accurate than IBFs.
+can see in Figure \ref{fig:fig15-estimated-accuracy-m} that the
+probability tends to behave in a non-linear fashion, with accuracy being
+higher when one class has a majority but does not dominate. In this
+case, IBFs tend to perform significantly better than non-linear
+partitions. The superiority of IBFs is uniform for the algorithm tree,
+whereas for evolutionary tree and random forest, orthogonal partitions
+are significantly more accurate than IBFs.
 
 It is important to keep in mind when interpreting these results, that
 each plot was estimated \emph{while setting three dimensions to their
@@ -955,28 +975,28 @@ generalize. The results, nonetheless, are illustrative of potentially
 the range of different conditions in which the use of IBFs might be
 desirable.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig12-estimated-accuracy-n-1.pdf}
 \caption{\label{fig:fig12-estimated-accuracy-n}Probability of correctly
 predicting an observations as a function of number of observations (n)}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig13-estimated-accuracy-f-1.pdf}
 \caption{\label{fig:fig13-estimated-accuracy-f}Probability of correctly
 predicting an observations as a function of number of features (f)}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig14-estimated-accuracy-k-1.pdf}
 \caption{\label{fig:fig14-estimated-accuracy-k}Probability of correctly
 predicting an observations as a function of number of classes (k)}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig15-estimated-accuracy-m-1.pdf}
 \caption{\label{fig:fig15-estimated-accuracy-m}Probability of correctly
@@ -1082,12 +1102,12 @@ individual records for part of Newark, coded by ethnicity according to
 the 1880 US Census. Of these, 7,659 records are classified as White
 Americans, 4,411 are classified as Irish, and 9,450 are classified as
 German. The geographical distribution of these groups in the region of
-Newark under study is shown in Figure \ref{fig:fig11-map-newark}.
+Newark under study is shown in Figure \ref{fig:fig16-map-newark}.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig11-map-newark-1.pdf}
-\caption{\label{fig:fig11-map-newark}Three ethnic groups in Newark (1880
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig16-map-newark-1.pdf}
+\caption{\label{fig:fig16-map-newark}Three ethnic groups in Newark (1880
 US Census)}
 \end{figure}
 
@@ -1109,7 +1129,7 @@ centered at the top right corner of the set of points, and scaled to the
 unit on the longest extent of the dataset. For comparison purposes, we
 begin by training a DT for this problem using conventional orthogonal
 partitions. The results of this model are shown in Figure
-\ref{fig:fig12-tree-orthogonal-newark}, a model with six terminal nodes
+\ref{fig:fig17-tree-orthogonal-newark}, a model with six terminal nodes
 that identify two predominantly German neighborhoods, three
 predominantly White American neighborhoods, and one predominantly Irish
 neighborhood. The model, after examining the interior branches, did not
@@ -1125,50 +1145,50 @@ minorities (27\% and 11\% respectively). Another neighborhood is
 strongly German, with over 70\% of the residents of that ethnicity,
 whereas one more has a plurality of Germans (41\%) but is otherwise
 quite mixed. The partitions of the DT in effect delimit the ethnic
-neighborhoods, as seen Figure \ref{fig:fig13-map-orthogonal-newark}.
+neighborhoods, as seen Figure \ref{fig:fig18-map-orthogonal-newark}.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig12-tree-orthogonal-newark-1.pdf}
-\caption{\label{fig:fig12-tree-orthogonal-newark}Decisiton tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig17-tree-orthogonal-newark-1.pdf}
+\caption{\label{fig:fig17-tree-orthogonal-newark}Decision tree with
 orthogonal partitions for spatial classification, Newark ethnic groups}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig13-map-orthogonal-newark-1.pdf}
-\caption{\label{fig:fig13-map-orthogonal-newark}Ethnic neighborhoods in
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig18-map-orthogonal-newark-1.pdf}
+\caption{\label{fig:fig18-map-orthogonal-newark}Ethnic neighborhoods in
 Newark, 1880, using orthogonal partitions}
 \end{figure}
 
 Next, the same dataset is used to train a tree with IBFs as listed
 above. The model was examined to determine that pruning was not
 required. The results of this model are shown in Figure
-\ref{fig:fig14-tree-basis-newark}. The model also has six terminal nodes
+\ref{fig:fig19-tree-basis-newark}. The model also has six terminal nodes
 which identify two German neighborhoods, three White American
 neigborhoods, and one Irish neighborhoods. Note that two of the
 partitions are orthogonal (i.e., \(lat < -0.37\) and \(lat \ge -0.16\)),
 two partitions are linear but oblique (i.e., \(long+lat \ge 0.51\) and
 \(long+lat \ge 0.21\)), and one partition is non-linear (i.e.,
 \(e^{long}+e^{lat} \ge 2.0\)). The ethnic neighborhoods are shown in
-Figure \ref{fig:fig15-map-basis-newark}. This model has an in-sample
+Figure \ref{fig:fig20-map-basis-newark}. This model has an in-sample
 error rate of 0.39 and a cross-validation error rate of 0.39, which is
 comparable to the orthogonal model. In this case, the analyst must
 decide whether the neighborhoods identified by the DT with IBFs are a
 more realistic representation of a spatial process.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig14-tree-basis-newark-1.pdf}
-\caption{\label{fig:fig14-tree-basis-newark}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig19-tree-basis-newark-1.pdf}
+\caption{\label{fig:fig19-tree-basis-newark}Decision tree with
 non-orthogonal/non-linear partitions for spatial classification, Newark
 ethnic groups}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig15-map-basis-newark-1.pdf}
-\caption{\label{fig:fig15-map-basis-newark}Ethnic neighborhoods in
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig20-map-basis-newark-1.pdf}
+\caption{\label{fig:fig20-map-basis-newark}Ethnic neighborhoods in
 Newark, 1880, using non-orthogonal partitions}
 \end{figure}
 
@@ -1201,38 +1221,38 @@ mean of the locations of the observations, a location that coincides
 with the central business district of the city. Further, the coordinates
 were scaled to the unit on the longest extent of the dataset. Land
 prices were log-transformed to mitigate their lack of normality. Figure
-\ref{fig:fig16-map-sapporo} shows the locations of the observations and
+\ref{fig:fig21-map-sapporo} shows the locations of the observations and
 prices. As can be seen there, Sapporo is a typical monocentric city,
 with the highest prices concentrated in and around the central business
 district.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig16-map-sapporo-1.pdf}
-\caption{\label{fig:fig16-map-sapporo}Land prices in Sapporo (log)}
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig21-map-sapporo-1.pdf}
+\caption{\label{fig:fig21-map-sapporo}Land prices in Sapporo (log)}
 \end{figure}
 
 As before, we train a DT using orthogonal partitions. The results of
-this model are shown in Figure \ref{fig:fig17-tree-orthogonal-sapporo},
+this model are shown in Figure \ref{fig:fig22-tree-orthogonal-sapporo},
 where it can be seen that the tree has thirteen terminal nodes, or
 equivalently spatial submarkets. This was the best-performing tree size,
 and there was no need to prune. The \(pseudo-R^2\) of this model is
 \(0.71\). The submarkets are shown in Figure
-\ref{fig:fig18-map-orthogonal-sapporo}, where it can be seen that the
+\ref{fig:fig23-map-orthogonal-sapporo}, where it can be seen that the
 submarkets manage to capture the monocentric structure of land prices in
 Sapporo, albeit in cubist style.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig17-tree-orthogonal-sapporo-1.pdf}
-\caption{\label{fig:fig17-tree-orthogonal-sapporo}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig22-tree-orthogonal-sapporo-1.pdf}
+\caption{\label{fig:fig22-tree-orthogonal-sapporo}Decision tree with
 orthogonal partitions for submarket identification, Sapporo land prices}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig18-map-orthogonal-sapporo-1.pdf}
-\caption{\label{fig:fig18-map-orthogonal-sapporo}Spatial land price
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig23-map-orthogonal-sapporo-1.pdf}
+\caption{\label{fig:fig23-map-orthogonal-sapporo}Spatial land price
 submarkets in Sapporo using orthogonal partitions}
 \end{figure}
 
@@ -1240,29 +1260,29 @@ The next step was to train a DT, but this time using IBFs as additional
 features in the dataset. The basis functions used are the same five IBFs
 used in the preceding example. The resulting DT was checked to see if
 pruning was appropriate, but the full tree gave the best results (see
-Figure \ref{fig:fig19-tree-basis-sapporo}). It is worthwhile noting that
+Figure \ref{fig:fig24-tree-basis-sapporo}). It is worthwhile noting that
 only one of seven partitions is orthogonal. The remaining six partitions
 are all non-linear. The number of terminal nodes/submarkets is eight
 compared to thirteen in the model with orthogonal partitions. Both
 models have a comparable performace, with a \(pseudo-R^2=0.71\), however
 the use of IBFs results in a more parsimonious model. Furthermore, the
-resulting market segments (see Figure \ref{fig:fig20-map-basis-sapporo})
+resulting market segments (see Figure \ref{fig:fig25-map-basis-sapporo})
 are much more appealing, and conform better to our theoretical
 understanding of the radial and anisotropic mechanisms of land price
 determination.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig19-tree-basis-sapporo-1.pdf}
-\caption{\label{fig:fig19-tree-basis-sapporo}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig24-tree-basis-sapporo-1.pdf}
+\caption{\label{fig:fig24-tree-basis-sapporo}Decision tree with
 non-orthogonal/non-linear partitions for submarket identification,
 Sapporo land prices}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig20-map-basis-sapporo-1.pdf}
-\caption{\label{fig:fig20-map-basis-sapporo}IBF-based non-orthogonal
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig25-map-basis-sapporo-1.pdf}
+\caption{\label{fig:fig25-map-basis-sapporo}IBF-based non-orthogonal
 land price regions (log) in Sapporo}
 \end{figure}
 
@@ -1353,7 +1373,7 @@ Prop\_postgraduate & PPG & 0.029 & 0.19 & 0.11 & 0.048\\
 We started by training an initial DT which resulted in a model with
 eleven terminal nodes. This model was examined, and based on performance
 was eventually pruned to give the model shown in Figure
-\ref{fig:fig21-tree-orthogonal-election}. This model has a
+\ref{fig:fig26-tree-orthogonal-election}. This model has a
 \(pseudo-R^2\) of \(0.24\). As seen in the figure, the model is
 relatively simple, and identifies two covariates that correlate with
 voter turnout, namely \% of population living in low income and
@@ -1363,17 +1383,17 @@ whereas the highest turnout rates are associated with Electoral
 Districts characterized by higher population density and low poverty
 rates.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig21-tree-orthogonal-election-1.pdf}
-\caption{\label{fig:fig21-tree-orthogonal-election}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig26-tree-orthogonal-election-1.pdf}
+\caption{\label{fig:fig26-tree-orthogonal-election}Decision tree with
 orthogonal partitions, Ontario voter turnout}
 \end{figure}
 
 The next step was to train a model that included IBFs as above. The
 initial model had eleven terminal nodes, but upon examination was pruned
 to produce the model shown in Figure
-\ref{fig:fig22-tree-basis-election}. The \(pseudo-R^2\) of this model is
+\ref{fig:fig27-tree-basis-election}. The \(pseudo-R^2\) of this model is
 \(0.44\). Note that three of the partitions in this model are oblique,
 and one is non-linear. Population density (PD), which appeared in the
 model with orthogonal partitions, is still part of this model in the
@@ -1387,10 +1407,10 @@ variables are often correlated with population living in poverty, but
 give a more refined view of the characteristics of populations that
 associate with voter turnout.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig22-tree-basis-election-1.pdf}
-\caption{\label{fig:fig22-tree-basis-election}Decision tree with
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig27-tree-basis-election-1.pdf}
+\caption{\label{fig:fig27-tree-basis-election}Decision tree with
 non-orthogonal/non-linear partitions, Ontario voter turnout}
 \end{figure}
 
@@ -1407,12 +1427,12 @@ maps in the previous two examples showing ethnic boundaries and market
 segments are essentially decision charts for the case of two features.
 An example of a set of decision charts for the multifeature voter
 turnout model is shown in Figure
-\ref{fig:fig23-election-decision-charts}.
+\ref{fig:fig28-election-decision-charts}.
 
-\begin{figure}
+\begin{figure}[htbp]
 \centering
-\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig23-election-decision-charts-1.pdf}
-\caption{\label{fig:fig23-election-decision-charts}Decision charts for
+\includegraphics{Trees_with_Base_Functions_v2_files/figure-latex/fig28-election-decision-charts-1.pdf}
+\caption{\label{fig:fig28-election-decision-charts}Decision charts for
 voter turnout}
 \end{figure}
 
@@ -1432,19 +1452,29 @@ Research}\label{conclusions-and-directions-for-future-research}
 Decision Trees are a popular data analysis technique used in a wide
 range of applications. The somewhat restrictive nature of binary
 orthogonal partitions has been recognized in the past, and a number of
-methods have been proposed in the literature to allow for oblique
-partitions. In this paper, we have proposed a new strategy to induce
-oblique and non-linear partitions for DTs. This is achieved by
-introducing Interactive Basis Functions. The use of IBFs is attractive
-because it can induce partitions of different shapes at a relatively low
+methods have been proposed in the literature that allow for oblique
+partitions. In this paper, we proposed a new strategy to induce oblique
+and non-linear partitions for DTs. This is achieved by introducing
+Interactive Basis Functions. The use of IBFs is attractive because it
+can induce partitions of different shapes at a relatively low
 computational cost. Furthermore, the underlying recursive-partition
 algorithm is not changed, which means that IBFs can be used with any
 implementation of DTs in existing software.
 
-A benchmarking exercise shows that the use of IBFs can improve the
-accuracy of the model and/or produce more parsimonious models, without
-greatly increasing computation time. Furthermore, three case studies
-illustrated the application and potential advantages of IBFs. In one
+An extensive benchmarking exercise using 93 publicly available
+classification datasets shows that the use of IBFs can improve the
+accuracy of the model without compromising model parsimony, at only very
+modest increases in computation time. Analysis of the results of the
+benchmarking experiments suggests that IBFs are consistently a superior
+alternative to conventional trees, and may also improve the performance
+of evolutionary trees and random forests. IBFs in particular seem to
+perform better for larger datasets with more features \(f\), and when
+the number of classes \(k\) is smaller and the target variable is not
+dominated by a single class, in other words when the proportion of the
+majority class \(m\) does not exceed \(40\)-\(50\)\%.
+
+In addition to the benchmarking experiments, three case studies helped
+to illustrate the application and potential advantages of IBFs. In one
 spatial classification example, the accuracy of the model was maintained
 but potentially more appealing boundaries were identified. In a market
 segmentation example, likewise, accuracy was maintained but a more
@@ -1473,6 +1503,9 @@ qualitative features. This is also a matter for future research.
 
 \section{Acknowledgments}\label{acknowledgments}
 
+A. Paez would like to thank Dr.~Tony Lea, Mr.~Sean Howard, Mr.~Peter
+Miron, and other participants in the Environics Analytics Methodological
+Seminars, for useful discussions in the early stages of this research.
 F.A. Lopez, M. Ruiz and M. Camacho acknowledge the financial support
 from projects ECO2015-65758-P, ECO2015-65637-P, and ECO2016-76178-P
 respectively. This study is the result of the activity carried out under
@@ -1551,6 +1584,11 @@ Choubin, B., H. Darabi, O. Rahmati, F. Sajedi-Hosseini, and B. Klove.
 Comparative Study of Machine Learning Techniques.'' Journal Article.
 \emph{Science of the Total Environment} 615: 272--81.
 doi:\href{https://doi.org/10.1016/j.scitotenv.2017.09.293}{10.1016/j.scitotenv.2017.09.293}.
+
+\hypertarget{ref-Dietterich2000}{}
+Dietterich, Thomas G. 2000. ``Ensemble Methods in Machine Learning.''
+Conference Proceedings. In \emph{International Workshop on Multiple
+Classifier Systems}, 1--15. Springer.
 
 \hypertarget{ref-Feitelson1993}{}
 Feitelson, E. 1993. ``An Hierarchical Approach to the Segmentation of
@@ -1659,7 +1697,7 @@ doi:\href{https://doi.org/https://doi.org/10.1016/j.eswa.2006.09.004}{https://do
 
 \hypertarget{ref-Liaw2002}{}
 Liaw, Andy, and Matthew Wiener. 2002. ``Classification and Regression by
-randomForest.'' \emph{R News} 2 (3): 18--22.
+RandomForest.'' \emph{R News} 2 (3): 18--22.
 \url{https://CRAN.R-project.org/doc/Rnews/}.
 
 \hypertarget{ref-Logan2011}{}
@@ -1686,6 +1724,12 @@ Manwani, N., and P. S. Sastry. 2012. ``Geometric Decision Tree.''
 Journal Article. \emph{IEEE Transactions on Systems, Man, and
 Cybernetics, Part B (Cybernetics)} 42 (1): 181--92.
 doi:\href{https://doi.org/10.1109/TSMCB.2011.2163392}{10.1109/TSMCB.2011.2163392}.
+
+\hypertarget{ref-Menze2011}{}
+Menze, Bjoern H, B Michael Kelm, Daniel N Splitthoff, Ullrich Koethe,
+and Fred A Hamprecht. 2011. ``On Oblique Random Forests.'' Conference
+Proceedings. In \emph{Joint European Conference on Machine Learning and
+Knowledge Discovery in Databases}, 453--69. Springer.
 
 \hypertarget{ref-Menze2012}{}
 Menze, Bjoern, and Nico Splitthoff. 2012. \emph{ObliqueRF: Oblique
@@ -1737,6 +1781,18 @@ Age of Big Data and Global Change.'' Journal Article. \emph{Geographical
 Review} 108 (1): 120--37.
 doi:\href{https://doi.org/10.1111/gere.12251}{10.1111/gere.12251}.
 
+\hypertarget{ref-QiuZhang2017}{}
+Qiu, Xueheng, Le Zhang, Ponnuthurai Nagaratnam Suganthan, and Gehan AJ
+Amaratunga. 2017. ``Oblique Random Forest Ensemble via Least Square
+Estimation for Time Series Forecasting.'' Journal Article.
+\emph{Information Sciences} 420: 249--62.
+
+\hypertarget{ref-RenZhang2016}{}
+Ren, Ye, Le Zhang, and Ponnuthurai N Suganthan. 2016. ``Ensemble
+Classification and Regression-Recent Developments, Applications and
+Future Directions.'' Journal Article. \emph{IEEE Computational
+Intelligence Magazine} 11 (1): 41--53.
+
 \hypertarget{ref-Ripley2018}{}
 Ripley, Brian. 2018. \emph{Tree: Classification and Regression Trees}.
 \url{https://CRAN.R-project.org/package=tree}.
@@ -1747,6 +1803,10 @@ Search Method for Nonsmooth Unconstrained Optimization.'' Journal
 Article. \emph{Computational Optimization and Applications} 56 (2):
 291--315.
 doi:\href{https://doi.org/10.1007/s10589-013-9560-9}{10.1007/s10589-013-9560-9}.
+
+\hypertarget{ref-Rokach2010}{}
+Rokach, Lior. 2010. ``Ensemble-Based Classifiers.'' Journal Article.
+\emph{Artificial Intelligence Review} 33 (1-2): 1--39.
 
 \hypertarget{ref-Stockemer2017}{}
 Stockemer, D. 2017. ``What Affects Voter Turnout? A Review
@@ -1824,6 +1884,29 @@ Yang, L. J., S. S. Liu, S. Tsoka, and L. G. Papageorgiou. 2017. ``A
 Regression Tree Approach Using Mathematical Programming.'' Journal
 Article. \emph{Expert Systems with Applications} 78: 347--57.
 doi:\href{https://doi.org/10.1016/j.eswa.2017.02.013}{10.1016/j.eswa.2017.02.013}.
+
+\hypertarget{ref-ZhangSuganthan2015}{}
+Zhang, Le, and Ponnuthurai N Suganthan. 2015. ``Oblique Decision Tree
+Ensemble via Multisurface Proximal Support Vector Machine.'' Journal
+Article. \emph{IEEE Transactions on Cybernetics} 45 (10): 2165--76.
+
+\hypertarget{ref-ZhangSuganthan2014}{}
+Zhang, Le, and Ponnuthurai Nagaratnam Suganthan. 2014. ``Random Forests
+with Ensemble of Feature Spaces.'' Journal Article. \emph{Pattern
+Recognition} 47 (10): 3429--37.
+
+\hypertarget{ref-ZhangSuganthan2017}{}
+---------. 2017. ``Benchmarking Ensemble Classifiers with Novel
+Co-Trained Kernel Ridge Regression and Random Vector Functional Link
+Ensembles {[}Research Frontier{]}.'' Journal Article. \emph{IEEE
+Computational Intelligence Magazine} 12 (4): 61--72.
+
+\hypertarget{ref-ZhangVaradajan2017}{}
+Zhang, Le, Jagannadan Varadarajan, Ponnuthurai Nagaratnam Suganthan,
+Narendra Ahuja, and Pierre Moulin. 2017. ``Robust Visual Tracking Using
+Oblique Random Forests.'' Conference Proceedings. In \emph{Proceedings
+of the Ieee Conference on Computer Vision and Pattern Recognition},
+5589--98.
 
 \hypertarget{ref-Zhu2018}{}
 Zhu, Hao. 2018. \emph{KableExtra: Construct Complex Table with 'Kable'

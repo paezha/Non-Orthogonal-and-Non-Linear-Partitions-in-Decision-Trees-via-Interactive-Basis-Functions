@@ -27,10 +27,9 @@ abstract: |
 bibliography: bibliography.bib
 output: rticles::elsevier_article
 header-includes:
-   - \usepackage{float}
-   - \usepackage[nomarkers,figuresonly]{endfloat}
-   - \floatplacement{figure}{H} #make every figure with caption = h
-   - \usepackage{booktabs}
+#   - \usepackage{float} #uncomment to float figures to end of output document
+#   - \usepackage[nomarkers,figuresonly]{endfloat} #uncomment to float figures to end of output document
+#   - \floatplacement{figure}{H} #make every figure with caption = h / uncomment to float figures to end of output document
    - \usepackage{booktabs}
    - \usepackage{longtable}
    - \usepackage{array}
@@ -138,7 +137,7 @@ Decision Trees (DTs) are a popular machine learning technique used both for regr
 
 Decision Trees find applications in a variety of domains, including, inter alia, transportation [e.g., @Ghasri2017], physical geography [e.g., @Praskievicz2018], engineering [e.g., @Bektas2013; @Suhail2018], and environmental sciences [e.g., @Choubin2018]. There are several characteristics that make DTs an appealing modeling approach. Notably, DTs are more intuitive than linear/logistic regression [@James2013 p. 315] and have much greater interpretability than, for instance, artificial neural networks and support vector machines [@Yang2017 p. 354].  In addition, in some settings DTs provide a reasonable heuristic for human decision making [@James2013 p. 315]. Finally, although no single technique can be expected to be uniformly superior in every case, the performance of DTs has been shown to be competitive with, and in some cases superior to, alternatives such as linear regression, logistic regression, support vector machines, and artificial neural networks [e.g., @Kurt2008; @Choubin2018; @Yang2017].
 
-One characteristic of DTs as conventionally implemented, is that partitions of the variable space are usually done orthogonally to the features. In this way, the partitions are a set of rectangular $p$-dimensional prisms,or hyperboxes. While this is done to reduce the search space of the algorithm, it has the downside that it may fail to find appropriate partitions, and in some extreme cases, to find any partitions at all. In this case, the performance of the algorithm tends to be mediocre. Accordingly, a number of proposals have aimed at ameliorating this situation by inducing oblique partitions [e.g., @Murthy1994; @Wickramarachchi2016; @Cantu-Paz2003].
+One characteristic of DTs as conventionally implemented, is that partitions of the variable space are usually done orthogonally to the features. In this way, the partitions are a set of rectangular $p$-dimensional prisms,or hyperboxes. While this is done to reduce the search space of the algorithm, it has the downside that it may fail to find appropriate partitions, and in some extreme cases, to find any partitions at all. In this case, the performance of the algorithm tends to be mediocre. Accordingly, a number of proposals have aimed at ameliorating this situation by inducing oblique partitions [e.g., @Murthy1994; @Wickramarachchi2016; @Cantu-Paz2003] and oblique decision tree ensemble variants [e.g., @Menze2011; @ZhangSuganthan2014; @ZhangSuganthan2015; @ZhangSuganthan2017; @ZhangVaradajan2017; @QiuZhang2017].
 
 The objective of this paper is to introduce a novel strategy for non-orthogonal partition of variable space in the training of DTs. The approach is based on the use of interactive basis functions (IBFs). We  will show that oblique partitions result as a particular case of an IBF. Moreover, depending on the basis function selected, non-linear partitions are also possible. The modeling strategy proposed in this paper is attractive because the basis functions can be precalculated and then used as an input to any decision tree algorithm. Since only the inputs to the algorithm change, this implies that 1) the underlying algorithm is not changed and therefore any existing DT software can be used; and 2) basis functions can be used in many existing implementations of DTs, including evolutionary trees, bagging, and boosting. 
 
@@ -151,7 +150,7 @@ Given the simplicity and ease of implementation of the modeling strategy, the de
 
 We begin in this section by formally describing the DT algorithm. This will serve to motivate subsequent sections of the paper.
 
-A decision tree is a regression/classification algorithm which models a response variable $Y$ (which could be quantitative or qualitative) from a vector of $p$ features, $X=(X_{1},\dots,X_{p})$, where $X\in \mathrm{R}^{p}$. The algorithm operates by recursively partitioning the space of the features into a set of $M$ regions $R_{m}$, $m=1,...,M$. 
+A decision tree is a regression/classification algorithm which models a response variable $Y$ (which could be quantitative or qualitative) from a vector of $p$ features, $X=(X_{1},\dots,X_{p})$, where $X\in \mathbb{R}^{p}$. The algorithm operates by recursively partitioning the space of the features into a set of $M$ regions $R_{m}$, $m=1,...,M$. 
 
 To state the basic notation, let us start by considering a binary tree model with $M$ terminal nodes, each of which $m\in \left\{ 1,...,M \right\}$ represents a branch of the tree that is characterized by $m^{\ast}$ internal splits. The parameter space that characterizes each branch is $\theta_{m}^{m^{\ast }}=\left(v_{m,1}^{d_{1}},s_{m,1},...,v_{{m,m}^{\ast }}^{d_{m^{\ast }}},s_{{m,m}^{\ast}} \right)$, where $X_{v_{m,i}}$ is the splitting variable at the internal split $i$ of the terminal node $m$, with $v_{mi}\in \left\{ 1,...,P \right\}$, $d_{i}=0$ if $X_{v_{m,i}}<s_{m,i}$ and $d_{i}=1$ if $X_{v_{m,i}}>s_{m,i}$, $s_{m,i}$ is the splitting point, and $i\in \left\{ 1,...,m^{\ast } \right\}$. The parameter space of trees with $M$ terminal nodes, $\Theta_{M}$, is formed by the collection of all the combinations of $\theta_{m}=\bigcup\limits_{j=1}^{m^{\ast }}\theta_{m}^{j}$, $\Theta_{M}=\bigcup\limits_{m=1}^M \theta_{m}$.  In this way, a tree is a collection of branches, each of which ends up in a terminal node, that characterizes the partitions or regions through $\theta_{m}$.
 
@@ -163,7 +162,7 @@ $$
 
 Within this framework, each branch $m$ is a collection of sequential partitions $\theta_{m}^{j}$, $j=1,\dots,m^{\ast }$. For each of these partitions, we define a prediction function $f\left( X,\theta _{m}^{j} \right)$, which typically is a central tendency measure of the values of the dependent variable conditional to that region. The goal is to find a decision tree that optimizes some tradeoff between prediction performance, measured by a loss function, $loss\left\{ Y,f\left( X,\theta_{m}^{j} \right) \right\}$, and a measure of the complexity of the tree, $comp\left( \theta_{m}^{j} \right)$, $\hat{\theta}_{m}^{j}=\arg \left[ loss\left\{ Y,f\left( X,\theta_{m}^{j} \right)\right\}+comp\left( \theta_{m}^{j} \right) \right].$
 
-In practice, the recursion ends when any additional partitions result in subsamples below a minimum number of cases (e.g., less than five cases). Operating in this way, the recursive partitioning method produces partitions that are orthogonal to the $p$ features, and thus results in a total of $M$ $p$-dimensional rectangular prisms, or hyperboxes (see Figure 1 \ref{fig:fig1-example} for a prototypical decision tree with two features $X_1$ and $X_2$).
+In practice, the recursion ends when any additional partitions result in subsamples below a minimum number of cases (e.g., less than five cases). Operating in this way, the recursive partitioning method produces partitions that are orthogonal to the $p$ features, and thus results in a total of $M$ $p$-dimensional rectangular prisms, or hyperboxes (see Figure \ref{fig:fig1-example} for a prototypical decision tree with two features $X_1$ and $X_2$).
 
 ```{r fig1-example, echo=FALSE, fig.cap="\\label{fig:fig1-example}Prototypical Decision Tree"}
 include_graphics("fig1-example.pdf")
@@ -171,22 +170,24 @@ include_graphics("fig1-example.pdf")
 
 Despite its advantages, it is not difficult to find examples where orthogonal recursive partitioning does not work. Consider the situation depicted in Figure \ref{fig:fig2-chessboard}, a simple classification problem with $p=2$ features. It is straightforward to see that in this case the algorithm fails to find an initial partition, as the loss function on the resulting subsets cannot be reduced by any first split. This situation, on the other hand, is easily avoided if oblique splits are used. In this case an optimal split can be found at the first step, as illustrated by the candidate split shown with a dashed line in the figure.
 
-```{r fig2-chessboard, echo = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig2-chessboard}Chessboard example"}
+```{r fig2-chessboard, echo = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig2-chessboard}Chessboard example with variable Y with two classes"}
 #Generate data
 X1 <- rep(seq(0.25, 1.75, 0.5), each = 4)
 X2 <- rep(seq(0.25, 1.75, 0.5), 4)
 Y <- rep(1, 16)
 Y[(X1 < 1 & X2 < 1) | (X1 > 1 & X2 > 1)] <- 2
-Y <- factor(Y, labels = c("O", "D"))
+Y <- factor(Y, labels = c("1", "2"))
 chess22 <- data.frame(Y, X1, X2)
 ggplot(chess22,aes(X1,X2,shape=Y,color=Y)) + 
   geom_point(size=4) +
   geom_abline(slope = -1, intercept = 1.3, linetype = 2) +
+  xlab(expression(X[1])) +
+  ylab(expression(X[2])) +
   coord_equal() +
   theme_minimal()
 ```
 
-Motivated by the challenge posed by situations such as the one in Figure \ref{fig:fig2-chessboard}, and more generally to better capture non-orthogonal decision boundaries, previous research has seen the development of numerous methods to induce oblique decision boundaries for trees [see @Cantu-Paz2003; and @Wickramarachchi2016 for an overview]. 
+Motivated by the challenge posed by situations such as the one in Figure \ref{fig:fig2-chessboard}, and more generally to better capture non-orthogonal decision boundaries, previous research has seen the development of numerous methods to induce oblique decision boundaries for trees [see @Cantu-Paz2003; and @Wickramarachchi2016 for an overview]. More concretely Menze et al. [-@Menze2011] propose the use of oblique random forests (oRF) which explicitly learn optimal split directions at internal nodes using linear discriminative models, rather than using random coefficients as the original oRF; Zhang and Suganthan [-@ZhangSuganthan2014] propose a new method to increase the diversity of each tree in the forests and thereby improve the overall accuracy by building the Random Forests with two projection methods Principal Component Analysis and Linear Discriminate Analysis; Zhang and Suganthan [-@ZhangSuganthan2015] propose a new method for oblique trees based on multisurface proximal support vector machine; Zhang et al. [-@ZhangVaradajan2017] propose to use a more powerful proximal SVM to obtain oblique hyperplanes to capture the geometric structure in the context of visual tracking; Zhang and Suganthan [-@ZhangSuganthan2017] propose an efficient co-trained kernel ridge regression method and a random vector functional link network ensemble that outperform the behavior of classical classifiers; Qiu et al. [-@QiuZhang2017] study the oblique random forest in the context of time series forecasting by using a least square classifier to perform partitions. Some others excellent reviews on ensemble learning are Dietterich [-@Dietterich2000], Rokach [-@Rokach2010], and Ren et al. [-@RenZhang2016] where the authors explain why ensembles can often perform better than any single classifier and reviews traditional as well as state-of-the-art ensemble methods.
 
 As discussed by Wickramarachchi et al. [-@Wickramarachchi2016], some algorithms used to induce oblique partitions identify candidate partition boundaries based on the statistical properties of the data. For instance, a number of algorithms use the orientation of the classes as given by their first principal component [@Henrichon1969], the Household projection matrix [@Wickramarachchi2016], or Fisher's linear discriminant [@Friedman1977]. New features are added to the problem, and the conventional orthogonal partition mechanism is retained. Other algorithms are based on optimization approaches, which could be deterministic or stochastic. CART-LC [@Breiman1984] is an example of the former, whereas Cantu-Paz and Kamath [-@Cantu-Paz2003] with their use of genetic algorithms is an example of the latter. The increase in complexity of these algorithms, and consequently their computational burden, comes from the additional steps needed to conduct additional statistical or optimization procedures. Finally, heuristic approaches have also been used, for example by Manwani and Sastry [-@Manwani2012] and Robertson, Price, and Reale [-@Robertson2013].
 
@@ -217,17 +218,16 @@ $$
 
 where $X^{\ast }\in \mathbb{R}^{p+T}$, and $X_{p+i}=b_{s_i}( X_{j_i})$, for $i=1,\dots ,T$, $s_i\in \{1,\dots,K\}$ and $j_i\in\{1,\dots,p\}$
 
-Notably, the standard recursive partitioning mechanism of Decision Trees applied to any $X_p$ in the augmented set $T$ leads to partitions of $\left(p+T\right)$-dimensional prisms. Furthermore, the projections of these prisms in the subspace of $\mathrm{R}^{p}$ defined by $X$ still reproduce a linear orthogothal partition of this space. Consider an example with $p=2$, that is $X=\{X_1,X_2\}$. Moreover, $T=1$ and $K=1$ with $b_1(x)=x^2$, so that $X^\ast=\{X_1,X_2,X_3=X_1^2\}$. Whenever the partitioning mechanism  selects a split $s$ in $X_3$ (say, $s=2$, the solid line in Figure \ref{fig:fig3-simple-basis}), this split is projected in $X$ as $X_1=\sqrt X_3$, which is a constant. As a consequence, any splits on the dimension of the basis function is equivalent to finding an orthogonal decision boundary on the original basis, in the present example at $\sqrt 2$ in $X_1$ (dashed line).
+Notably, the standard recursive partitioning mechanism of Decision Trees applied to any $X_p$ in the augmented set $T$ leads to partitions of $\left(p+T\right)$-dimensional prisms. Furthermore, the projections of these prisms in the subspace of $\mathbb{R}^{p}$ defined by $X$ are a consequence of a linear orthogothal partition on the original space. Consider an example with $p=2$, that is $X=\{X_1,X_2\}$. Moreover, $T=1$ and $K=1$ with $b_1(x)=x^2$, so that $X^\ast=\{X_1,X_2,X_3=X_1^2\}$. Whenever the partitioning mechanism  selects a split $s$ in $X_3$ (say, $s=2$, the solid line in Figure \ref{fig:fig3-simple-basis}), this split is projected in $X$ as $X_1=\sqrt X_3$, which is a constant. As a consequence, any splits on the dimension of the basis function is equivalent to finding an orthogonal decision boundary on the original basis, in the present example at $\sqrt 2$ in $X_1$ (dashed line).
 
-```{r fig3-simple-basis, echo = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig3-simple-basis}Example of a basis function used as a feature to train a Decision Tree"}
+```{r fig3-simple-basis, echo = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig3-simple-basis}Example of a basis function used as a feature to train a Decision Tree to classify variable Y with two classes"}
 #Generate data
-random_df <- data.frame(X1 = rnorm(20, sqrt(2), 0.25)) %>% mutate(X2 = X1^2, class = cut(X1,c(0, sqrt(2), Inf), labels = c("1", "2")))
+random_df <- data.frame(X1 = rnorm(20, sqrt(2), 0.25)) %>% mutate(X2 = X1^2, Y = cut(X1,c(0, sqrt(2), Inf), labels = c("1", "2")))
 ggplot(data = NULL, aes(x = X1, y = X2)) + 
-  geom_point(data = random_df, aes(color = class, shape = class), size = 3) +
-  geom_hline(yintercept = 2) +
+  geom_point(data = random_df, aes(color = Y, shape = Y), size = 3) +
   geom_vline(xintercept = sqrt(2), linetype = 2) +
   xlab(expression(X[1])) +
-  ylab(expression(X[2]*" = "*X[1]^2)) +
+  ylab(expression(X[2])) +
   theme_minimal()
 ```
 
@@ -315,7 +315,7 @@ $$
 h_1(b_1(X_1),b_1(X_2))=b_1(X_1)+b_2(X_2)=a_1X_1+a_2X_2
 $$
 
-In this way, the implementation of IBFs as non-parametric functions leads to a semi-parametric version of DTs. With respect to the complexity of the search, the introduction of IBFs increases the complexity at each node of the tree (when using the conventional search algorithm) by $O(n(p+D))$, where $n$ is the number of cases, $p$ is the number of features, and $D$ is the number of IBFs under consideration. Compare to the exaustive search for oblique decision boundaries [$O(2^p \times{n\choose{p}})$, in @Murthy1994], or an algorithm such as HHCART, which has complexity of $O(Cp^2nlog(n))$ [where $C$ is the number of classes in classification problems, @Wickramarachchi2016]. As can be appreciated, the increase in complexity with our approach is fairly modest.
+In this way, the implementation of IBFs as non-parametric functions leads to a semi-parametric version of DTs. With respect to the complexity of the search, the introduction of IBFs increases the complexity at each node of the tree (when using the conventional search algorithm) by $O(n(p+D))$, where $n$ is the number of cases, $p$ is the number of features, and $D$ is the number of IBFs under consideration. In contrast, the exhaustive search for oblique decision boundaries has complexity of $O(2^p \times{n\choose{p}})$ according to Murthy et al. [-@Murthy1994], and $O(Cp^2nlog(n))$ in HHCART [where $C$ is the number of classes in classification problems, @Wickramarachchi2016]. As can be appreciated, the increase in complexity with our approach is fairly modest.
 
 4 Practical Considerations
 ===================
@@ -420,7 +420,7 @@ h_2(b_1(X_1)b_3(X_2))=b_1(X_1)b_3(X_2)=X_1e^{X_2}
 \end{array}
 $$
 
-The size of the experiment is as follows: three different methods (tree/random forest/evolutionary tree), ninety three different datasets, two different types of partitions (orthogonal/IBFs), and four replications for each (i.e., 10-fold cross-validation). The summary of the results is shown in Table \ref{tab:summary-benchmarking}, where it can be seen that random forests outperform evolutionary trees, which in turn outperform conventional trees. This is as anticipated. Further, for the same algorithm, the use of IBF increases the average accuracy slightly, and provides similar results in terms of kappa and the mean tree size.
+The size of the experiment is as follows: three different methods (tree/random forest/evolutionary tree), ninety three different datasets, two different types of partitions (orthogonal/IBFs), and four replications for each (i.e., 4-fold cross-validation). The summary of the results is shown in Table \ref{tab:summary-benchmarking}, where it can be seen that random forests outperform evolutionary trees, which in turn outperform conventional trees. This is as anticipated. Further, for the same algorithm, the use of IBF increases the average accuracy slightly, and provides similar results in terms of kappa and the mean tree size.
 
 ```{r join-results, echo=FALSE}
 #Join dataframes
@@ -446,7 +446,7 @@ kable(benchmark_summary, "latex", booktabs = TRUE, digits = 2,
 
 The aggregated results suggest that IBFs may improve the accuracy of the algorithms without necessarily leading to more complex models. In this subsection, we take a look first at the results of the benchmarking experiment in terms of the accuracy of the different implementations of the algorithms. 
 
-Figure \ref{fig:fig8-performance-algorithm-results} presents the results of the experiments by method in terms of their accuracy. The horizontal axis is for datasets, ranked from the lowest average accuracy of all methods, to the highest. The plot shows the mean accuracy and standard deviation of each algorithm for each dataset. It can be seen there that the lowest accuracy is around $25$% and the highest is $100$% in the test sample. In general terms, as hinted by the summary results, random forests perform better and tree worse, but this is not always the case. Moreover, there are notable differences between the use of orthogonal and IBF within each methods.
+Figure \ref{fig:fig8-performance-algorithm-results} presents the results of the experiments by method in terms of their accuracy. The horizontal axis is for datasets, ranked from the lowest average accuracy of all methods, to the highest. The plot shows the mean accuracy and standard deviation of each algorithm for each dataset. It can be seen there that the lowest accuracy is around $25$% and the highest is $100$% in the test sample. In general terms, as hinted by the summary results, random forests perform better and tree worse, but this is not always the case. Moreover, as will be shown next, there are notable differences between the use of orthogonal and IBF within each method.
 
 ```{r data-accuracy-test, include=FALSE}
 #Wrangle data for plotting accuracy
@@ -668,7 +668,7 @@ Figure \ref{fig:fig13-estimated-accuracy-f} shows the results for the number of 
 
 The third dimension that we investigate is the number of classes. As shown in Figure \ref{fig:fig14-estimated-accuracy-k}, there is a general tendency for accuracy to deteriorate as the number of classes $k$ incrases. However, despite starting at higher levels of accuracy with respect to orthogonal partitions, this happens much more rapidly when IBFs are used. In this case, IBFs are associated with better or similar accuracy when $k\leq3$ but have significantly lower levels of accuracy when the dependent variables has more classes.
 
-Lastly, with respect to the proportion of the majority class $m$, we can see that the probability tends to behave in a non-linear fashion, with accuracy being higher when one class has a majority but does not dominate. In this case, IBFs tend to perform significantly better than non-linear partitions. The superiority of IBFs is uniform for the algorithm tree, whereas for evolutionary tree and random forest, orthogonal partitions are significantly more accurate than IBFs.
+Lastly, with respect to the proportion of the majority class $m$, we can see in Figure \ref{fig:fig15-estimated-accuracy-m} that the probability tends to behave in a non-linear fashion, with accuracy being higher when one class has a majority but does not dominate. In this case, IBFs tend to perform significantly better than non-linear partitions. The superiority of IBFs is uniform for the algorithm tree, whereas for evolutionary tree and random forest, orthogonal partitions are significantly more accurate than IBFs.
 
 It is important to keep in mind when interpreting these results, that each plot was estimated _while setting three dimensions to their median values_. For this reason, one must be cautious when trying to generalize. The results, nonetheless, are illustrative of potentially the range of different conditions in which the use of IBFs might be desirable.
 
@@ -857,9 +857,9 @@ As illustrated in the benchmarking exercise above, the modelling strategy propos
 
 The first example that we present is concerned with a spatial classification problem. This kind of problem is often found in geography, public health, and sociology, among other disciplines, and addresses the objective of defining spatial neighborhoods. Examples of this kind of research in the literature include include Gaudart et al. [-@Gaudart2005], a team of reserchers who developed oblique DTs to identify high risk clusters of malaria. Research by Folch and Spielmann [-@Folch2014] led to an algorithm to identify regions with flexible constraints. Wong and Huang [-@Wong2017] identify geographical spheres of influence based on social media data. One more example is the research by Logan et al. [-@Logan2011] that aimed at identifying ethnic neighborhoods using historical datasets.
 
-The example presented here is similar in spirit to the research of Logan et al. [-@Logan2011], and makes use of a portion of the same historical dataset [see @Logan2011urbanhistorical]. The dataset consists of `r nrow(Newark)` individual records for part of Newark, coded by ethnicity according to the 1880 US Census. Of these, `r prettyNum(sum(Newark$Ethnicity == "NW"), big.mark = ",")` records are classified as White Americans, `r prettyNum(sum(Newark$Ethnicity == "IRISH"), big.mark = ",")` are classified as Irish, and `r prettyNum(sum(Newark$Ethnicity == "GERMAN"), big.mark = ",")` are classified as German. The geographical distribution of these groups in the region of Newark under study is shown in Figure \ref{fig:fig11-map-newark}.
+The example presented here is similar in spirit to the research of Logan et al. [-@Logan2011], and makes use of a portion of the same historical dataset [see @Logan2011urbanhistorical]. The dataset consists of `r nrow(Newark)` individual records for part of Newark, coded by ethnicity according to the 1880 US Census. Of these, `r prettyNum(sum(Newark$Ethnicity == "NW"), big.mark = ",")` records are classified as White Americans, `r prettyNum(sum(Newark$Ethnicity == "IRISH"), big.mark = ",")` are classified as Irish, and `r prettyNum(sum(Newark$Ethnicity == "GERMAN"), big.mark = ",")` are classified as German. The geographical distribution of these groups in the region of Newark under study is shown in Figure \ref{fig:fig16-map-newark}.
 
-```{r fig11-map-newark, cache = TRUE, echo = FALSE, message = FALSE, fig.cap="\\label{fig:fig11-map-newark}Three ethnic groups in Newark (1880 US Census)"}
+```{r fig16-map-newark, cache = TRUE, echo = FALSE, message = FALSE, fig.cap="\\label{fig:fig16-map-newark}Three ethnic groups in Newark (1880 US Census)"}
 #Plot geocoded observations usig ggmap
 ggmap(Newark.bm) + 
   geom_point(data = Newark, aes(x = (long * max_range_newark + ref_long_newark), 
@@ -896,16 +896,16 @@ mod1 <- rpart(Ethnicity ~ long + lat, Newark)
 #printcp(mod1) # Lowest cross-validation error is with full tree
 ```
 
-After some experimentation, the coordinates of the observations were centered at the top right corner of the set of points, and scaled to the unit on the longest extent of the dataset. For comparison purposes, we begin by training a DT for this problem using conventional orthogonal partitions. The results of this model are shown in Figure \ref{fig:fig12-tree-orthogonal-newark}, a model with six terminal nodes that identify two predominantly German neighborhoods, three predominantly White American neighborhoods, and one predominantly Irish neighborhood. The model, after examining the interior branches, did not require pruning.
+After some experimentation, the coordinates of the observations were centered at the top right corner of the set of points, and scaled to the unit on the longest extent of the dataset. For comparison purposes, we begin by training a DT for this problem using conventional orthogonal partitions. The results of this model are shown in Figure \ref{fig:fig17-tree-orthogonal-newark}, a model with six terminal nodes that identify two predominantly German neighborhoods, three predominantly White American neighborhoods, and one predominantly Irish neighborhood. The model, after examining the interior branches, did not require pruning.
 
-This model has an in-sample error rate of `r round(0.56087 * 0.69635, digits = 2)` and a cross-validation error rate of `r round(0.56087 * 0.69776, digits = 2)`. The population of two of the White American Neighborhoods is over 60% of that ethnic group. Another neighborhood has a plurality (49%) of White Americans and a more or less even distribution of Irish (22%) and Germans (29%). One neighborhood is strongly Irish (62% of population) with White American and German minorities (27% and 11% respectively). Another neighborhood is strongly German, with over 70% of the residents of that ethnicity, whereas one more has a plurality of Germans (41%) but is otherwise quite mixed. The partitions of the DT in effect delimit the ethnic neighborhoods, as seen Figure \ref{fig:fig13-map-orthogonal-newark}. 
+This model has an in-sample error rate of `r round(0.56087 * 0.69635, digits = 2)` and a cross-validation error rate of `r round(0.56087 * 0.69776, digits = 2)`. The population of two of the White American Neighborhoods is over 60% of that ethnic group. Another neighborhood has a plurality (49%) of White Americans and a more or less even distribution of Irish (22%) and Germans (29%). One neighborhood is strongly Irish (62% of population) with White American and German minorities (27% and 11% respectively). Another neighborhood is strongly German, with over 70% of the residents of that ethnicity, whereas one more has a plurality of Germans (41%) but is otherwise quite mixed. The partitions of the DT in effect delimit the ethnic neighborhoods, as seen Figure \ref{fig:fig18-map-orthogonal-newark}. 
 
-```{r fig12-tree-orthogonal-newark, fig.cap="\\label{fig:fig12-tree-orthogonal-newark}Decisiton tree with orthogonal partitions for spatial classification, Newark ethnic groups", echo=FALSE}
+```{r fig17-tree-orthogonal-newark, fig.cap="\\label{fig:fig17-tree-orthogonal-newark}Decision tree with orthogonal partitions for spatial classification, Newark ethnic groups", echo=FALSE}
 rpart.plot(mod1)
 #text(mod1, pretty = FALSE)
 ```
 
-```{r fig13-map-orthogonal-newark, fig.cap="\\label{fig:fig13-map-orthogonal-newark}Ethnic neighborhoods in Newark, 1880, using orthogonal partitions", echo=FALSE}
+```{r fig18-map-orthogonal-newark, fig.cap="\\label{fig:fig18-map-orthogonal-newark}Ethnic neighborhoods in Newark, 1880, using orthogonal partitions", echo=FALSE}
 #predict using mod1
 #create a grid for prediction
 prediction.grid <- expand.grid(long = seq(from = min(Newark$long), 
@@ -931,9 +931,9 @@ mod2 <- rpart(Ethnicity ~ ., Newark)
 #printcp(mod2) # Lowest cross-validation error is with full tree
 ```
 
-Next, the same dataset is used to train a tree with IBFs as listed above. The model was examined to determine that pruning was not required. The results of this model are shown in Figure \ref{fig:fig14-tree-basis-newark}. The model also has six terminal nodes which identify two German neighborhoods, three White American neigborhoods, and one Irish neighborhoods. Note that two of the partitions are orthogonal (i.e., $lat < -0.37$ and $lat \ge -0.16$), two partitions are linear but oblique (i.e., $long+lat \ge 0.51$ and $long+lat \ge 0.21$), and one partition is non-linear (i.e., $e^{long}+e^{lat} \ge 2.0$). The ethnic neighborhoods are shown in Figure \ref{fig:fig15-map-basis-newark}. This model has an in-sample error rate of `r round(0.56087 * 0.70414, digits = 2)` and a cross-validation error rate of `r round(0.56087 * 0.70373, digits = 2)`, which is comparable to the orthogonal model. In this case, the analyst must decide whether the neighborhoods identified by the DT with IBFs are a more realistic representation of a spatial process.
+Next, the same dataset is used to train a tree with IBFs as listed above. The model was examined to determine that pruning was not required. The results of this model are shown in Figure \ref{fig:fig19-tree-basis-newark}. The model also has six terminal nodes which identify two German neighborhoods, three White American neigborhoods, and one Irish neighborhoods. Note that two of the partitions are orthogonal (i.e., $lat < -0.37$ and $lat \ge -0.16$), two partitions are linear but oblique (i.e., $long+lat \ge 0.51$ and $long+lat \ge 0.21$), and one partition is non-linear (i.e., $e^{long}+e^{lat} \ge 2.0$). The ethnic neighborhoods are shown in Figure \ref{fig:fig20-map-basis-newark}. This model has an in-sample error rate of `r round(0.56087 * 0.70414, digits = 2)` and a cross-validation error rate of `r round(0.56087 * 0.70373, digits = 2)`, which is comparable to the orthogonal model. In this case, the analyst must decide whether the neighborhoods identified by the DT with IBFs are a more realistic representation of a spatial process.
 
-```{r fig14-tree-basis-newark, echo=FALSE, fig.cap="\\label{fig:fig14-tree-basis-newark}Decision tree with non-orthogonal/non-linear partitions for spatial classification, Newark ethnic groups", message=FALSE}
+```{r fig19-tree-basis-newark, echo=FALSE, fig.cap="\\label{fig:fig19-tree-basis-newark}Decision tree with non-orthogonal/non-linear partitions for spatial classification, Newark ethnic groups", message=FALSE}
 mod2$frame$var <- revalue(mod2$frame$var, c("<leaf>" = "<leaf>", "long"="long", "lat"="lat",
                                             "long_plus_lat"="long + lat", "longXlat"="long x lat",
                                             "long2_plus_lat2"="long^2 + lat^2", 
@@ -944,7 +944,7 @@ rpart.plot(mod2, cex = 0.75)
 ```
 
 
-```{r fig15-map-basis-newark, fig.cap="\\label{fig:fig15-map-basis-newark}Ethnic neighborhoods in Newark, 1880, using non-orthogonal partitions", echo=FALSE}
+```{r fig20-map-basis-newark, fig.cap="\\label{fig:fig20-map-basis-newark}Ethnic neighborhoods in Newark, 1880, using non-orthogonal partitions", echo=FALSE}
 #predict using mod2
 #create a grid for prediction
 prediction.grid <- expand.grid(long = seq(from = min(Newark$long), to = max(Newark$long), by = 0.005),
@@ -972,7 +972,7 @@ The case presented next is similar to the spatial classification problem above, 
 
 One obvious limitation of using orthogonal partitions in the case of real estate spatial submarkets is that the processes that drive land rent (and therefore property values) tend to be radial and are possibly anisotropic due to inhomogeneities in the landscape. The canonical urban economic theory for monocentric cities (which has since been expanded to polycentric cities) states that land rent decays from business districts [@Alonso1964], a prediction that is borne by numerous empirical studies.
 
-The illustration presented here deals with land prices in Sapporo, Japan. The dataset consists of `r nrow(sapporo)` observations of geocoded land prices (in $\yen/m^2$). Informed by the literature on property valuation, the coordinates (in longitude and latitude) were centered on the geometric mean of the locations of the observations, a location that coincides with the central business district of the city. Further, the coordinates were scaled to the unit on the longest extent of the dataset. Land prices were log-transformed to mitigate their lack of normality. Figure \ref{fig:fig16-map-sapporo} shows the locations of the observations and prices. As can be seen there, Sapporo is a typical monocentric city, with the highest prices concentrated in and around the central business district.
+The illustration presented here deals with land prices in Sapporo, Japan. The dataset consists of `r nrow(sapporo)` observations of geocoded land prices (in $\yen/m^2$). Informed by the literature on property valuation, the coordinates (in longitude and latitude) were centered on the geometric mean of the locations of the observations, a location that coincides with the central business district of the city. Further, the coordinates were scaled to the unit on the longest extent of the dataset. Land prices were log-transformed to mitigate their lack of normality. Figure \ref{fig:fig21-map-sapporo} shows the locations of the observations and prices. As can be seen there, Sapporo is a typical monocentric city, with the highest prices concentrated in and around the central business district.
 
 ```{r convert-spatial-sapporo, echo=FALSE}
 #convert data frame to spatial points data frame
@@ -994,7 +994,7 @@ sapporo$optional <- NULL
 
 ```
 
-```{r fig16-map-sapporo, echo=FALSE, fig.cap="\\label{fig:fig16-map-sapporo}Land prices in Sapporo (log)"}
+```{r fig21-map-sapporo, echo=FALSE, fig.cap="\\label{fig:fig21-map-sapporo}Land prices in Sapporo (log)"}
 #Plot geocoded observations usig ggmap
 ggmap(sapporo.bm) + 
   geom_point(data = sapporo, aes(x = (long * max_range_sapporo + ref_long_sapporo), 
@@ -1016,14 +1016,14 @@ sapporo_mod1 <- rpart(logPrice ~ long + lat, sapporo)
 #printcp(sapporo_mod1) #lowest cross-validation error is full tree
 ```
 
-As before, we train a DT using orthogonal partitions. The results of this model are shown in Figure \ref{fig:fig17-tree-orthogonal-sapporo}, where it can be seen that the tree has thirteen terminal nodes, or equivalently spatial submarkets. This was the best-performing tree size, and there was no need to prune. The $pseudo-R^2$ of this model is $0.71$. The submarkets are shown in Figure \ref{fig:fig18-map-orthogonal-sapporo}, where it can be seen that the submarkets manage to capture the monocentric structure of land prices in Sapporo, albeit in cubist style.
+As before, we train a DT using orthogonal partitions. The results of this model are shown in Figure \ref{fig:fig22-tree-orthogonal-sapporo}, where it can be seen that the tree has thirteen terminal nodes, or equivalently spatial submarkets. This was the best-performing tree size, and there was no need to prune. The $pseudo-R^2$ of this model is $0.71$. The submarkets are shown in Figure \ref{fig:fig23-map-orthogonal-sapporo}, where it can be seen that the submarkets manage to capture the monocentric structure of land prices in Sapporo, albeit in cubist style.
 
-```{r fig17-tree-orthogonal-sapporo, echo=FALSE, fig.cap="\\label{fig:fig17-tree-orthogonal-sapporo}Decision tree with orthogonal partitions for submarket identification, Sapporo land prices", fig.height=8, fig.show='asis'}
+```{r fig22-tree-orthogonal-sapporo, echo=FALSE, fig.cap="\\label{fig:fig22-tree-orthogonal-sapporo}Decision tree with orthogonal partitions for submarket identification, Sapporo land prices", fig.height=8, fig.show='asis'}
 rpart.plot(sapporo_mod1, digits = 4)
 #text(sapporo_mod1, pretty = FALSE)
 ```
 
-```{r fig18-map-orthogonal-sapporo, message = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig18-map-orthogonal-sapporo}Spatial land price submarkets in Sapporo using orthogonal partitions", echo=FALSE}
+```{r fig23-map-orthogonal-sapporo, message = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig23-map-orthogonal-sapporo}Spatial land price submarkets in Sapporo using orthogonal partitions", echo=FALSE}
 #predict using sapporo_mod1
 #create a grid for prediction
 prediction.grid <- expand.grid(long = seq(from = min(sapporo$long) - 0.35, 
@@ -1069,9 +1069,9 @@ sapporo_mod2 <- rpart(logPrice ~ long + lat + long_plus_lat + longXlat + long2_p
 #printcp(sapporo_mod2) # Lowest cross-validation error is with full tree
 ```
 
-The next step was to train a DT, but this time using IBFs as additional features in the dataset. The basis functions used are the same five IBFs used in the preceding example. The resulting DT was checked to see if pruning was appropriate, but the full tree gave the best results (see Figure \ref{fig:fig19-tree-basis-sapporo}). It is worthwhile noting that only one of seven partitions is orthogonal. The remaining six partitions are all non-linear. The number of terminal nodes/submarkets is eight compared to thirteen in the model with orthogonal partitions. Both models have a comparable performace, with a $pseudo-R^2=0.71$, however the use of IBFs results in a more parsimonious model. Furthermore, the resulting market segments (see Figure \ref{fig:fig20-map-basis-sapporo}) are much more appealing, and conform better to our theoretical understanding of the radial and anisotropic mechanisms of land price determination. 
+The next step was to train a DT, but this time using IBFs as additional features in the dataset. The basis functions used are the same five IBFs used in the preceding example. The resulting DT was checked to see if pruning was appropriate, but the full tree gave the best results (see Figure \ref{fig:fig24-tree-basis-sapporo}). It is worthwhile noting that only one of seven partitions is orthogonal. The remaining six partitions are all non-linear. The number of terminal nodes/submarkets is eight compared to thirteen in the model with orthogonal partitions. Both models have a comparable performace, with a $pseudo-R^2=0.71$, however the use of IBFs results in a more parsimonious model. Furthermore, the resulting market segments (see Figure \ref{fig:fig25-map-basis-sapporo}) are much more appealing, and conform better to our theoretical understanding of the radial and anisotropic mechanisms of land price determination. 
 
-```{r fig19-tree-basis-sapporo, fig.cap="\\label{fig:fig19-tree-basis-sapporo}Decision tree with non-orthogonal/non-linear partitions for submarket identification, Sapporo land prices", fig.height=8, fig.show='asis', echo=FALSE, message=FALSE}
+```{r fig24-tree-basis-sapporo, fig.cap="\\label{fig:fig24-tree-basis-sapporo}Decision tree with non-orthogonal/non-linear partitions for submarket identification, Sapporo land prices", fig.height=8, fig.show='asis', echo=FALSE, message=FALSE}
 sapporo_mod2$frame$var <- revalue(sapporo_mod2$frame$var, c("<leaf>" = "<leaf>", "long"="long", "lat"="lat",
                                             "long_plus_lat"="long + lat", "longXlat"="long x lat",
                                             "long2_plus_lat2"="long^2 + lat^2", 
@@ -1081,7 +1081,7 @@ rpart.plot(sapporo_mod2, digits = 4)
 #text(sapporo_mod2, pretty = FALSE)
 ```
 
-```{r fig20-map-basis-sapporo, message = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig20-map-basis-sapporo}IBF-based non-orthogonal land price regions (log) in Sapporo", echo=FALSE}
+```{r fig25-map-basis-sapporo, message = FALSE, fig.show = 'asis', fig.cap= "\\label{fig:fig25-map-basis-sapporo}IBF-based non-orthogonal land price regions (log) in Sapporo", echo=FALSE}
 #predict using sapporo_mod1
 #create a grid for prediction
 prediction.grid <- expand.grid(long = seq(from = min(sapporo$long) - 0.35, 
@@ -1209,7 +1209,7 @@ data.model <- data.frame(Voter_Turnout = data.model$Voter_Turnout,
                      as.data.frame(scale(data.model[,2:ncol(data.model)], center = mins, scale = maxs - mins)))
 ```
 
-We started by training an initial DT which resulted in a model with eleven terminal nodes. This model was examined, and based on performance was eventually pruned to give the model shown in Figure \ref{fig:fig21-tree-orthogonal-election}. This model has a $pseudo-R^2$ of $0.24$. As seen in the figure, the model is relatively simple, and identifies two covariates that correlate with voter turnout, namely % of population living in low income and population density. The lowest voter turnout rates are associated with Electoral Districts with higher rates of population living in poverty, whereas the highest turnout rates are associated with Electoral Districts characterized by higher population density and low poverty rates.
+We started by training an initial DT which resulted in a model with eleven terminal nodes. This model was examined, and based on performance was eventually pruned to give the model shown in Figure \ref{fig:fig26-tree-orthogonal-election}. This model has a $pseudo-R^2$ of $0.24$. As seen in the figure, the model is relatively simple, and identifies two covariates that correlate with voter turnout, namely % of population living in low income and population density. The lowest voter turnout rates are associated with Electoral Districts with higher rates of population living in poverty, whereas the highest turnout rates are associated with Electoral Districts characterized by higher population density and low poverty rates.
 
 ```{r train-orthogonal-election, echo=FALSE, include=FALSE}
 election_mod1 <- rpart(Voter_Turnout ~ ., data.model)
@@ -1222,7 +1222,7 @@ printcp(election_mod1)
 election_mod1_pruned <- prune(election_mod1, cp = 0.080300)
 ```
 
-```{r fig21-tree-orthogonal-election, echo=FALSE, fig.cap="\\label{fig:fig21-tree-orthogonal-election}Decision tree with orthogonal partitions, Ontario voter turnout", fig.height=8, fig.show='asis'}
+```{r fig26-tree-orthogonal-election, echo=FALSE, fig.cap="\\label{fig:fig26-tree-orthogonal-election}Decision tree with orthogonal partitions, Ontario voter turnout", fig.height=8, fig.show='asis'}
 rpart.plot(election_mod1_pruned, cex = 0.75, digits = 4)
 ```
 
@@ -1301,7 +1301,7 @@ expPCDXexpPUB = exp(Prop_college_diploma) * exp( Prop_university_bachelor), expP
 expPUBXexpPPG = exp(Prop_university_bachelor) * exp( Prop_postgraduate))
 ```
 
-The next step was to train a model that included IBFs as above. The initial model had eleven terminal nodes, but upon examination was pruned to produce the model shown in Figure \ref{fig:fig22-tree-basis-election}. The $pseudo-R^2$ of this model is $0.44$. Note that three of the partitions in this model are oblique, and one is non-linear. Population density (PD), which appeared in the model with orthogonal partitions, is still part of this model in the last interior node. However, percentage of population living in poverty is not. Instead, average income taxes as percentage of income (AITPI), median age (MA), and several academic achievement variables entered the model (proportion of trade certificates: PTC; proportion of college diploma: PCD; proportion of high school diploma: PHSD; proportion of university bachelor: PUB; and propotion with no certificate: PNC). These variables are often correlated with population living in poverty, but give a more refined view of the characteristics of populations that associate with voter turnout.
+The next step was to train a model that included IBFs as above. The initial model had eleven terminal nodes, but upon examination was pruned to produce the model shown in Figure \ref{fig:fig27-tree-basis-election}. The $pseudo-R^2$ of this model is $0.44$. Note that three of the partitions in this model are oblique, and one is non-linear. Population density (PD), which appeared in the model with orthogonal partitions, is still part of this model in the last interior node. However, percentage of population living in poverty is not. Instead, average income taxes as percentage of income (AITPI), median age (MA), and several academic achievement variables entered the model (proportion of trade certificates: PTC; proportion of college diploma: PCD; proportion of high school diploma: PHSD; proportion of university bachelor: PUB; and propotion with no certificate: PNC). These variables are often correlated with population living in poverty, but give a more refined view of the characteristics of populations that associate with voter turnout.
 
 ```{r train-basis-election, include=FALSE}
 election_mod2 <- rpart(Voter_Turnout ~ ., data.model)
@@ -1314,7 +1314,7 @@ printcp(election_mod2)
 election_mod2_pruned <- prune(election_mod2, cp = 0.049738)
 ```
 
-```{r fig22-tree-basis-election, echo=FALSE, fig.cap="\\label{fig:fig22-tree-basis-election}Decision tree with non-orthogonal/non-linear partitions, Ontario voter turnout", fig.show='asis'}
+```{r fig27-tree-basis-election, echo=FALSE, fig.cap="\\label{fig:fig27-tree-basis-election}Decision tree with non-orthogonal/non-linear partitions, Ontario voter turnout", fig.show='asis'}
 election_mod2_pruned$frame$var <- plyr::revalue(election_mod2_pruned$frame$var, c("<leaf>" = "<leaf>", 
                                                               "AITPI_plus_PTC"="AITPI + PTC",
                                                               "MA_plus_PCD"="MA + PCD",
@@ -1323,7 +1323,7 @@ election_mod2_pruned$frame$var <- plyr::revalue(election_mod2_pruned$frame$var, 
 rpart.plot(election_mod2_pruned, cex = 0.75, digits = 4)
 ```
 
-In the case of a multifeature dataset, interpretation of a DT with IBFs is not as straightforward as it was for orthogonal partitions, particularly considering that the variables were centered and scaled. In order to enhance the interpretability of the results of models with IBFs, we propose to use a device we call decision charts. These charts allow us to plot the decision boundaries in the space of the two basis implied by each node of the tree. By recentering and rescaling the decision boundaries back to the units of the original basis vectors, a simple protocol can be devised to interpret the results of a model. The maps in the previous two examples showing ethnic boundaries and market segments are essentially decision charts for the case of two features. An example of a set of decision charts for the multifeature voter turnout model is shown in Figure \ref{fig:fig23-election-decision-charts}.
+In the case of a multifeature dataset, interpretation of a DT with IBFs is not as straightforward as it was for orthogonal partitions, particularly considering that the variables were centered and scaled. In order to enhance the interpretability of the results of models with IBFs, we propose to use a device we call decision charts. These charts allow us to plot the decision boundaries in the space of the two basis implied by each node of the tree. By recentering and rescaling the decision boundaries back to the units of the original basis vectors, a simple protocol can be devised to interpret the results of a model. The maps in the previous two examples showing ethnic boundaries and market segments are essentially decision charts for the case of two features. An example of a set of decision charts for the multifeature voter turnout model is shown in Figure \ref{fig:fig28-election-decision-charts}.
 
 ```{r decision-chart-1, echo=FALSE}
 #Plot splits in original units/create decision charts:
@@ -1455,7 +1455,7 @@ p4 <- ggplot(data = new_data, aes(x = x, y = y)) +
   annotate("text", x = 150, y = 0.23, label = "Turnout = 58.28%")
 ```
 
-```{r fig23-election-decision-charts, fig.cap="\\label{fig:fig23-election-decision-charts}Decision charts for voter turnout", warning=FALSE, echo=FALSE}
+```{r fig28-election-decision-charts, fig.cap="\\label{fig:fig28-election-decision-charts}Decision charts for voter turnout", warning=FALSE, echo=FALSE}
 grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```
 
@@ -1464,9 +1464,11 @@ As seen in the figure, low voter turnouts are associated with Electoral District
 7 Conclusions and Directions for Future Research
 ===================
 
-Decision Trees are a popular data analysis technique used in a wide range of applications. The somewhat restrictive nature of binary orthogonal partitions has been recognized in the past, and a number of methods have been proposed in the literature to allow for oblique partitions. In this paper, we have proposed a new strategy to induce oblique and non-linear partitions for DTs. This is achieved by introducing Interactive Basis Functions. The use of IBFs is attractive because it can induce partitions of different shapes at a relatively low computational cost. Furthermore, the underlying recursive-partition algorithm is not changed, which means that IBFs can be used with any implementation of DTs in existing software.
+Decision Trees are a popular data analysis technique used in a wide range of applications. The somewhat restrictive nature of binary orthogonal partitions has been recognized in the past, and a number of methods have been proposed in the literature that allow for oblique partitions. In this paper, we proposed a new strategy to induce oblique and non-linear partitions for DTs. This is achieved by introducing Interactive Basis Functions. The use of IBFs is attractive because it can induce partitions of different shapes at a relatively low computational cost. Furthermore, the underlying recursive-partition algorithm is not changed, which means that IBFs can be used with any implementation of DTs in existing software.
 
-A benchmarking exercise shows that the use of IBFs can improve the accuracy of the model and/or produce more parsimonious models, without greatly increasing computation time. Furthermore, three case studies illustrated the application and potential advantages of IBFs. In one spatial classification example, the accuracy of the model was maintained but potentially more appealing boundaries were identified. In a market segmentation example, likewise, accuracy was maintained but a more parsimonious and theoretically consistent model was obtained. And in a multifeature model of voter turnout, IBFs led to a better model fit and a more parsimonious model.
+An extensive benchmarking exercise using 93 publicly available classification datasets shows that the use of IBFs can improve the accuracy of the model without compromising model parsimony, at only very modest increases in computation time. Analysis of the results of the benchmarking experiments suggests that IBFs are consistently a superior alternative to conventional trees, and may also improve the performance of evolutionary trees and random forests. IBFs in particular seem to perform better for larger datasets with more features $f$, and when the number of classes $k$ is smaller and the target variable is not dominated by a single class, in other words when the proportion of the majority class $m$ does not exceed $40$-$50$%.
+
+In addition to the benchmarking experiments, three case studies helped to illustrate the application and potential advantages of IBFs. In one spatial classification example, the accuracy of the model was maintained but potentially more appealing boundaries were identified. In a market segmentation example, likewise, accuracy was maintained but a more parsimonious and theoretically consistent model was obtained. And in a multifeature model of voter turnout, IBFs led to a better model fit and a more parsimonious model.
 
 One downside of using oblique/non-linear partitions in DTs is that the interpretability of the typical visual output (as a tree with binary branches) becomes compromised. To remedy this situation we introduced a new tool called decision charts, a set of visual devices where new inputs can be located to help an analyst to reach a decision using the underlying DT.
 
@@ -1475,7 +1477,7 @@ As we noted in the paper, the additive IBF is equivalent to previous efforts to 
 Acknowledgments
 ==========
 
-F.A. Lopez, M. Ruiz and M. Camacho acknowledge the financial support from projects ECO2015-65758-P, ECO2015-65637-P, and ECO2016-76178-P respectively. This study is the result of the activity carried out under the program Groups of Excellence of the Region of Murcia, the Fundacion Seneca, Science and Technology Agency of the region of Murcia project 19884/GERM/15. The following R packages were used during this research, and the authors wish to acknowledge their developers: `tidyverse` [@Wickham2017], `plyr` [@Wickham2011], `readxl` [@Wickham2018], `ggthemes` [@Arnold2018], `tree` [@Ripley2018], `evtree` [@Grubinger2014], `rpart` [@Therneau2017], `rpart.plot` [@Milborrow2018], `ggmap` [@Khale2013], `readr` [@Wickham2017readr], `rgdal` [@Bivand2018], `knitr` [@Xie2015; @Xie2018], `kableExtra` [@Zhu2018], `mlbench` [@Newman1998], `dprep` [@Acuna2015], `rattle.data` [@Williams2011], `microbenchmark` [@Mersmann2018], `RColorBrewer` [@Neuwirth2014], `scales` [@Wickham2018scales], and `gridExtra` [@Auguie2017].
+A. Paez would like to thank Dr. Tony Lea, Mr. Sean Howard, Mr. Peter Miron, and other participants in the Environics Analytics Methodological Seminars, for useful discussions in the early stages of this research. F.A. Lopez, M. Ruiz and M. Camacho acknowledge the financial support from projects ECO2015-65758-P, ECO2015-65637-P, and ECO2016-76178-P respectively. This study is the result of the activity carried out under the program Groups of Excellence of the Region of Murcia, the Fundacion Seneca, Science and Technology Agency of the region of Murcia project 19884/GERM/15. The following R packages were used during this research, and the authors wish to acknowledge their developers: `tidyverse` [@Wickham2017], `plyr` [@Wickham2011], `readxl` [@Wickham2018], `ggthemes` [@Arnold2018], `tree` [@Ripley2018], `evtree` [@Grubinger2014], `rpart` [@Therneau2017], `rpart.plot` [@Milborrow2018], `ggmap` [@Khale2013], `readr` [@Wickham2017readr], `rgdal` [@Bivand2018], `knitr` [@Xie2015; @Xie2018], `kableExtra` [@Zhu2018], `mlbench` [@Newman1998], `dprep` [@Acuna2015], `rattle.data` [@Williams2011], `microbenchmark` [@Mersmann2018], `RColorBrewer` [@Neuwirth2014], `scales` [@Wickham2018scales], and `gridExtra` [@Auguie2017].
 
 References {#references .unnumbered}
 ==========
