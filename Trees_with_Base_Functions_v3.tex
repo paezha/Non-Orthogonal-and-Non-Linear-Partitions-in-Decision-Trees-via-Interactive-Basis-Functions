@@ -439,7 +439,7 @@ For example, in the case of \(p=2\), that is \(X=\{X_1,X_2\}\), \(T=1\),
 \(K=1\) with \(b_1(x)=x\), \(D=1\) with
 \(h_1(b_1(X_1),b_1(X_2))=b_1(X_1)+b_2(X_2)=X_1+X_2\) (i.e., an additivie
 function) and \(X^{\ast }=\left( X_{1},X_{2},X_{3} \right)\) we obtain
-that \(X_3=s\) is projected in the plane of the original basis as
+that \(X_3=s\) is projected on the plane of the original basis as
 \(X_2=s-X_1\), thus providing an oblique partition on that plane as
 shown in Figure \ref{fig:fig4-additive-basis}.
 
@@ -555,16 +555,15 @@ variables (bottom panel)}
 \section{5 Benchmarking}\label{benchmarking}
 
 In this section we conduct a benchmarking exercise using a collection of
-publicly available datasets that are widely used in the literature to
-test the performance of machine learning techniques. The source of the
-data is the paper of Fernandez-Delgado et al. (2014), who conducted an
-extensive experiment testing machine learning algorithms. These authors
-conducted their experiments with \(121\) datasets. An extensive list of
-classifiers were applied to these datasets, and then the classifiers
-were ranked based on their average accuracy and probability that they
-succeed by chance (measured by means of Cohen's kappa). The results
-indicate that the best classifiers belong to the family of Random
-Forests and Support Vector Machines.
+publicly available datasets. The source of the data is the paper of
+Fernandez-Delgado et al. (2014), who conducted an extensive experiment
+testing machine learning algorithms. These authors conducted their
+experiments with \(121\) datasets. An extensive list of classifiers were
+applied to these datasets, and then the classifiers were ranked based on
+their average accuracy and probability that they succeed by chance
+(measured by means of Cohen's kappa). Their results indicate that the
+best classifiers belong to the family of Random Forests and Support
+Vector Machines.
 
 Our focus in the present paper is on comparing DT-based algorithms only.
 Fernandez-Delgado et al. (2014) already provide a comprehensive ranking
@@ -590,22 +589,22 @@ The experiments were conducted using a parallel implementation of the
 code, using 4 Intel i7-6600U cores clocked at 2.60 GHz. For the present
 study we use a subset of the \(121\) datasets from the collection of
 Fernandez-Delgado et al. (2014). After excluding a number of datasets
-that led to errors with the evolutionary tree algorithm we tested, we
-work with the \(93\) datasets listed in Table \ref{tab:Datasets}. The
-main reason for the errors was a large number of observations, which may
-be a limitation of our computer resources rather than the algorithm. The
-table lists some of the characteristics of the datasets, including the
-number of observations (\(n\)), the number of features (\(f\)), the
-number of classes (\(k\)) of the independent variable, and the
-proportion of the majority class in the dataset (\(m\)).
+that led to errors when running the evolutionary tree algorithm, we work
+with \(93\) datasets. The main reason for the errors was a large number
+of observations, which may be a limitation of our computer resources
+rather than the algorithm. Table \ref{tab:Datasets} lists the
+characteristics of the datasets, including the number of observations
+(\(n\)), the number of features (\(f\)), the number of classes (\(k\))
+of the independent variable, and the proportion of the majority class in
+the dataset (\(m\)).
 
 \begin{longtable}[t]{rlrrrr}
-\caption{\label{tab:dataset-description}\label{tab:Datasets}Datasets for Benchmarking Experiment (n: number of observations, f: number of features, k: number of classes, m: proportion of majority class}\\
+\caption{\label{tab:dataset-description}\label{tab:Datasets}Datasets for Benchmarking Experiment (n: number of observations, f: number of features, k: number of classes, m: proportion of majority class)}\\
 \toprule
 Dataset \# & Name & n & f & k & m\\
 \midrule
 \endfirsthead
-\caption[]{\label{tab:Datasets}Datasets for Benchmarking Experiment (n: number of observations, f: number of features, k: number of classes, m: proportion of majority class \textit{(continued)}}\\
+\caption[]{\label{tab:Datasets}Datasets for Benchmarking Experiment (n: number of observations, f: number of features, k: number of classes, m: proportion of majority class) \textit{(continued)}}\\
 \toprule
 Dataset \# & Name & n & f & k & m\\
 \midrule
@@ -733,10 +732,11 @@ et al. (2014) have already been normalized to have a mean of zero and a
 standard deviation of one (p.~3139). We use the variables as they are,
 rather than changing them. The experiments are conducted using
 \(k\)-fold cross-validation, a technique commonly used to assess the
-performance of algorithms that involves randomly thinning a dataset to
-obtain a \((100 - 100/k)\)\% training sample, in a procedure that is
-repeated \(k\) times. In line with the experiments of Fernandez-Delgado
-et al. (2014) in this section we use 4-fold cross-validation.
+performance of algorithms. \(k\)-fold cross-validation involves randomly
+thinning a dataset to obtain a \((100 - 100/k)\)\% training sample, in a
+procedure that is repeated \(k\) times. In line with the experiments of
+Fernandez-Delgado et al. (2014) in this section we use 4-fold
+cross-validation.
 
 In terms of the IBFs, we consider the following functions: \[
 \begin{array}{c}\
@@ -776,8 +776,8 @@ of the results is shown in Table \ref{tab:summary-benchmarking}, where
 it can be seen that random forests outperform evolutionary trees, which
 in turn outperform conventional trees. This is as anticipated. Further,
 for the same algorithm, the use of IBF increases the average accuracy
-slightly, and provides similar results in terms of kappa and the mean
-tree size.
+slightly, and provides similar results in terms of kappa and mean tree
+size.
 
 \begin{longtable}[t]{rrrrrrr}
 \caption{\label{tab:accuracy-by-dataset-table}\label{tab:accuracy-by-dataset}Accuracy by Dataset}\\
@@ -924,23 +924,30 @@ for evolutionary tree).
 These results would suggest that it does not matter whether orthogonal
 partitions or IBFs are used in any given analysis. An important
 limitation of this conclusion is that it assumes that all datasets are
-comparable. As seen in Table \ref{tab:Datasets}, howeve, the datasets in
-the experiments vary widely in terms of number of observations and
-composition (number of features, classes, and proportion of majority
+comparable. As seen in Table \ref{tab:Datasets}, however, the datasets
+in the experiment vary widely in terms of their number of observations
+and composition (number of features, classes, and proportion of majority
 class). Inspection of Table \ref{tab:accuracy-by-dataset}, where the
-accuracy results by dataset are reported, shows IBFs sometimes
-out-perform orthogonal partitions - but does this happen in a systematic
-way? To overcome the limitation of the Friedman test, in the following
-section we take a multivariate approach to investigate the performance
-results.
+accuracy results by dataset are reported, shows that IBFs sometimes
+out-perform orthogonal partitions - but does this happen haphazardly, or
+on the contrary, in a systematic way? To overcome the limitation of the
+Friedman test, which ignores the differences in the datasets, in the
+following section we take a multivariate approach to delve more deeply
+into the results of the benchmarking experiments.
 
 \subsection{5.1 Accuracy}\label{accuracy}
 
-The aggregated results suggest that IBFs may improve the accuracy of the
-algorithms without necessarily leading to more complex models. In this
-subsection, we take a multivariate approach to further investigate the
-results of the benchmarking experiment in terms of the accuracy of the
-different implementations of the algorithms.
+As discussed above, the summary statistics of the results suggest that
+IBFs improve the accuracy of the algorithms only slightly, albeit
+without necessarily leading to more complex models. In this subsection,
+we take a multivariate approach to further investigate the results of
+the benchmarking experiment in terms of the accuracy of the different
+implementations of the algorithms. In other words, we are interested in
+whether the choice between orthogonal partitions and IBFs is simply a
+matter of a coin toss, or whether we can distinguish circumstances in
+which one approach is consistently better than the other.
+
+We begin by visualizing some of the results.
 
 Figure \ref{fig:fig8-performance-algorithm-results} presents the results
 of the experiments by method in terms of their accuracy. The horizontal
@@ -950,8 +957,8 @@ deviation of each algorithm for each dataset. It can be seen there that
 the lowest accuracy is around \(25\)\% and the highest is \(100\)\% in
 the test sample. In general terms, as hinted by the summary results,
 random forests perform better and trees worse, but this is not always
-the case. Moreover, as will be shown next, there are notable differences
-between the use of orthogonal and IBF within each method.
+the case. Moreover, as will be discussed next, there are notable
+differences between the use of orthogonal and IBF within each method.
 
 \begin{figure}
 \centering
@@ -961,13 +968,13 @@ results: Classification accuracy by Algorithm}
 \end{figure}
 
 Figure \ref{fig:fig9-accuracy-tree} compares the results of implementing
-the tree algorithms with orthogonal partitions and IBF. Taking as a
+the tree algorithm with orthogonal partitions and IBFs. Taking as a
 baseline the accuracy of the models with orthogonal partitions, the
 datasets are ranked from the largest accuracy loss to the largest
 accuracy gain attained by the models with IBFs. As seen in the figure,
 the implementation with IBFs leads to accuracy gains in 53 out of 93
-datasets, just over 50\% of the time - which would explain why the
-Friedman test is not significant. On the other hand, the maximum
+datasets, that is, just over 50\% of the time - which would explain why
+the Friedman test is not significant. On the other hand, the maximum
 accuracy gain is 26.61\% whereas the maximum loss is -14.77\%. In other
 words, it is not only a matter of whether IBFs perform better, but also
 how much better.
@@ -979,9 +986,9 @@ how much better.
 tree: orthogonal and IBF implementations}
 \end{figure}
 
-With respect to random forest, Figure \ref{fig:fig10-accuracy-forest}
-compares the results of implementing the algorithm with orthogonal
-partitions and IBF. Again, taking as a baseline the accuracy of the
+With respect to the random forest algorithm, Figure
+\ref{fig:fig10-accuracy-forest} compares the results with orthogonal
+partitions and IBFs. Again, taking as a baseline the accuracy of the
 models with orthogonal partitions, the datasets are ranked from the
 largest accuracy loss to the largest accuracy gain attained by the
 models with IBFs. As seen in the figure, the implementation with IBFs
@@ -1012,9 +1019,9 @@ whereas the maximum loss is -25\%.
 evolutionary tree: orthogonal and IBF implementations}
 \end{figure}
 
-To further disentangle the performance of the IBFs in DTs from diverse
-conditions, we estimate two models using the results of the benchmarking
-experiments.
+To further disentangle the performance of the IBFs in DTs in datasets
+with diverse characteristics, we estimate two models using the results
+of the benchmarking experiments.
 
 In these models the independent variable is a proportion, namely the
 number of times that the algorithm correctly predicts an observation in
@@ -1023,22 +1030,22 @@ estimated using the full set of results (i.e., the results from the
 4-fold cross-validation), whereas Model 2 is estimated using the
 accuracy of the best performer within each set of 4-folds. The
 appropriate modeling approach for proportions is the logistic model. For
-this model, we use as explanatory variables the attributes of the
+these models, we use as explanatory variables the attributes of the
 datasets, to wit, the number of observations (\(n\)), the number of
 features (\(f\)), the number of classes in the dependent variable
 (\(k\)), and the proportion of the majority class (\(m\)), as well as
 their squares in order to capture non-linearities. Furthermore, we use
-an indicator variable (\(method\)) for the three algorithms (i.e.~tree,
-random forest, evolutionary tree), and whether the basis function
-(\(bf\)) was orthogonal or IBF. In addition we interact the variable for
-the basis function (\(bf\)) with other variables. The results of the
-model appear in Table \ref{tab:model-accuracy-results}. As seen there,
-all coefficients are significant at conventional levels of significance.
-The significant variable interactions obscure the overall effect:
-whereas the coefficient for IBF is significant and positive, which
-indicates that the use of IBFs increases the accuracy of the algorithms,
-it is best to simulate the probability of a success to more fully
-realize their effect.
+an indicator variable (\(method\)) for the algorithms (i.e.~tree, random
+forest, evolutionary tree), and whether the basis function (\(bf\)) was
+orthogonal or IBF. In addition we interact the variable for the basis
+function (\(bf\)) with other variables. The results of the models appear
+in Table \ref{tab:model-accuracy-results}. As seen there, most
+coefficients are significant at conventional levels of significance. The
+coefficients for IBF are significant and positive, which indicates that
+the use of IBFs increases the accuracy of the algorithms, however the
+net effect needs to account for the variable interactions. For this
+reason it is best to simulate the probability of a success to more fully
+understand how IBFs impact predictive accuracy.
 
 \begin{table}
 
@@ -1094,34 +1101,36 @@ In Figures \ref{fig:fig12-estimated-accuracy-n},
 predicting an observation are plotted with respect to the
 characteristics of the datasets. The probabilities are predicted within
 the first decile and and ninth decile of the corresponding variable, to
-avoid making predictions in regions were the number of observations are
-sparse (for instance, as seen in Table \ref{tab:Datasets}, there is only
-one dataset with \(n>40,000\)). As well, the remaining variables are set
-at their median values. In this way, when predicting the probability as
-a function of \(n\), \(f\), \(k\), and \(m\) are set to their in-sample
+avoid making predictions in regions were observations are sparse (for
+instance, as seen in Table \ref{tab:Datasets}, there is only one dataset
+with \(n>40,000\)). As well, the remaining variables are set to their
+median values. In this way, when predicting the probability as a
+function of \(n\), \(f\), \(k\), and \(m\) are set to their in-sample
 median values. The plots show the estimated probabilities with their
 respective \(95\)\% confidence intervals.
 
-With respect to the size of the dataset (\(n\)), the general trend is
-that accuracy tends to decline for bigger datasets (see Figure
-\ref{fig:fig12-estimated-accuracy-n}). The use of IBFs is a clear
-improvement over DTs with orthogonal partitions, however, this is not
-the case for evolutionary trees, an algorithm that performs
-significantly better with orthogonal partitions. In the case of random
-forests, there is a a small significant difference between orthogonal
-partitions and IBFs, with orthogonal partitions leading to better
-accuracy for smaller datasets only (\(n<1,500\)).
+With respect to the size of the dataset (\(n\)), the general trend
+indicated by Model 1 is that accuracy tends to decline for bigger
+datasets (see Figure \ref{fig:fig12-estimated-accuracy-n}). The use of
+IBFs is a clear improvement over DTs with orthogonal partitions,
+however, this is not the case for evolutionary trees, an algorithm that
+performs significantly better with orthogonal partitions. In the case of
+random forests, there is a a small significant difference between
+orthogonal partitions and IBFs, with orthogonal partitions leading to
+better accuracy for smaller datasets only (\(n<1,500\)). These results
+are replicated by Model 2, but with stronger gains for IBFs.
 
 Figure \ref{fig:fig13-estimated-accuracy-f} shows the results for the
-number of features \(f\). As seen there, accuracy tends to improve as
-the number of features increases, irrespective of the method or basis
-function. Similar to the size of the sample, using IBFs uniformly tends
-to improve accuracy for the algorithm tree. Evolutionary trees are
-significantly more accurate when using orthogonal partitions. And
-orthogonal partitions in random forests work slightly better than IBFs,
-but only when the number of features is relatively small, approximately
-less than \(15\), after which point the difference is no longer
-significant.
+number of features \(f\). As seen there, overall accuracy (Model 1)
+tends to improve as the number of features increases, irrespective of
+the method or basis function. Similar to the size of the sample, using
+IBFs uniformly tends to improve accuracy for the algorithm tree.
+Evolutionary trees are significantly more accurate when using orthogonal
+partitions. And orthogonal partitions in random forests work slightly
+better than IBFs, but only when the number of features is relatively
+small, approximately less than \(15\), after which point the difference
+is no longer significant. This is similar in the case of Model 2, again,
+with a further favorable edge in the case of IBFs.
 
 The third dimension that we investigate is the number of classes. As
 shown in Figure \ref{fig:fig14-estimated-accuracy-k}, there is a general
@@ -1130,7 +1139,9 @@ incrases. However, despite starting at higher levels of accuracy with
 respect to orthogonal partitions, this happens much more rapidly when
 IBFs are used. In this case, IBFs are associated with better or similar
 accuracy when \(k\leq3\) but have significantly lower levels of accuracy
-when the dependent variables has more classes.
+when the dependent variables has more classes. The speed at which the
+performance of IBFs declines is somewhat slower for the best performing
+cases (Model 2).
 
 Lastly, with respect to the proportion of the majority class \(m\), we
 can see in Figure \ref{fig:fig15-estimated-accuracy-m} that the
@@ -1139,7 +1150,8 @@ higher when one class has a majority but does not dominate. In this
 case, IBFs tend to perform significantly better than non-linear
 partitions. The superiority of IBFs is uniform for the algorithm tree,
 whereas for evolutionary tree and random forest, orthogonal partitions
-are significantly more accurate than IBFs.
+are significantly more accurate than IBFs. When looking at the best
+performers (Model 2), the superiority of IBFs is more uniform.
 
 It is important to keep in mind when interpreting these results, that
 each plot was estimated \emph{while setting three dimensions to their
@@ -1638,13 +1650,14 @@ An extensive benchmarking exercise using 93 publicly available
 classification datasets shows that the use of IBFs can improve the
 accuracy of the model without compromising model parsimony, at only very
 modest increases in computation time. Analysis of the results of the
-benchmarking experiments suggests that IBFs are consistently a superior
-alternative to conventional trees, and may also improve the performance
-of evolutionary trees and random forests. IBFs in particular seem to
-perform better for larger datasets with more features \(f\), and when
-the number of classes \(k\) is smaller and the target variable is not
-dominated by a single class, in other words when the proportion of the
-majority class \(m\) does not exceed \(40\)-\(50\)\%.
+benchmarking experiments suggests that IBFs are a superior alternative
+to conventional trees in a wide range of situations, and may also
+improve the performance of evolutionary trees and random forests. IBFs
+in particular seem to perform better for 1) larger datasets; 2) with a
+large number of features \(f\); 3) when the number of classes \(k\) is
+small; and 4) the target variable is not dominated by a single class, in
+other words when the proportion of the majority class \(m\) does not
+exceed \(40\)-\(50\)\%.
 
 In addition to the benchmarking experiments, three case studies helped
 to illustrate the application and potential advantages of IBFs. In one
@@ -1681,8 +1694,8 @@ Miron, and other participants in the Environics Analytics Methodological
 Seminars, for useful discussions in the early stages of this research.
 F.A. Lopez, M. Ruiz and M. Camacho acknowledge the financial support
 from projects ECO2015-65758-P, ECO2015-65637-P, and ECO2016-76178-P
-respectively. This study is the result of the activity carried out under
-the program Groups of Excellence of the Region of Murcia, the Fundacion
+respectively. This study is a result of activity carried out under the
+program Groups of Excellence of the Region of Murcia, the Fundacion
 Seneca, Science and Technology Agency of the region of Murcia project
 19884/GERM/15. The following R packages were used during this research,
 and the authors wish to acknowledge their developers: \texttt{tidyverse}
