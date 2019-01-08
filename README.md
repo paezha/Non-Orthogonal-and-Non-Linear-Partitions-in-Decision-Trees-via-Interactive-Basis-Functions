@@ -1,8 +1,6 @@
 # Non-Orthogonal-and-Non-Linear-Partitions-in-Decision-Trees-via-Interactive-Basis-Functions
 
-This research appeaed in Expert Systems with Application as:
-
-Antonio Paez, Fernando Lopez, Manuel Ruiz, and Maximo Camacho, Inducing Non-Orthogonal and Non-Linear Decision Boundaries in Decision Trees via Interactive Basis Functions
+Paez, A., López, F., Ruiz, M., Camacho, M., 2019. Inducing non-orthogonal and non-linear decision boundaries in decision trees via interactive basis functions. Expert Systems with Applications 122, 183-206.
 
 https://doi.org/10.1016/j.eswa.2018.12.041
 
