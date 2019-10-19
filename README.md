@@ -1,4 +1,4 @@
-# Non-Orthogonal-and-Non-Linear-Partitions-in-Decision-Trees-via-Interactive-Basis-Functions
+# Inducing non-orthogonal and non-linear decision boundaries in decision trees via interactive basis functions
 
 Paez, A., López, F., Ruiz, M., Camacho, M., 2019. Inducing non-orthogonal and non-linear decision boundaries in decision trees via interactive basis functions. Expert Systems with Applications 122, 183-206.
 
